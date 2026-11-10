@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Cadastrar Insígnia</title>
+    <link rel="stylesheet" href="/admin-static/style.css">
+</head>
+
+<body>
+
+    <h1>Cadastrar Insígnia</h1>
+
+    <form
+        action="/admin/badges"
+        method="post"
+        enctype="multipart/form-data"
+    >
+
+        <div>
+            <label for="name">
+                Nome
+            </label>
+
+            <input
+                type="text"
+                id="name"
+                name="name"
+                required
+            >
+        </div>
+
+        <br>
+
+        <div>
+            <label for="description">
+                Descrição
+            </label>
+
+            <textarea
+                id="description"
+                name="description"
+                rows="5"
+            ></textarea>
+        </div>
+
+        <br>
+
+        <div>
+            <label for="image">
+                Imagem
+            </label>
+
+            <input
+                type="file"
+                id="image"
+                name="image"
+                accept="image/*"
+            >
+        </div>
+
+        <br>
+
+        <button type="submit">
+            Cadastrar Insígnia
+        </button>
+
+    </form>
+
+    <br>
+
+    <a href="/admin/mupi-objects">
+        Voltar para cadastro de MUPI
+    </a>
+
+</body>
+
+</html>

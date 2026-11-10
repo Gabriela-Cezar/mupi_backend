@@ -1,0 +1,74 @@
+import hashlib
+import hmac
+from datetime import datetime, timedelta, timezone
+
+import jwt
+
+from app.core.config import SECRET_KEY
+
+ALGORITHM = "HS256"
+RESET_TOKEN_MINUTES = 10
+ACCESS_TOKEN_DAYS = 7
+
+
+def _fingerprint(password_hash: str) -> str:
+    return hashlib.sha256(password_hash.encode()).hexdigest()[:16]
+
+
+def fingerprint_matches(payload: dict, current_password_hash: str) -> bool:
+    return hmac.compare_digest(
+        str(payload.get("fp", "")),
+        _fingerprint(current_password_hash)
+    )
+
+
+# Nome usado pelo auth_controller
+reset_token_matches = fingerprint_matches
+
+
+# ---------- Token de recuperação de senha ----------
+
+def create_reset_token(email: str, current_password_hash: str) -> str:
+    payload = {
+        "sub": email,
+        "purpose": "password_reset",
+        "fp": _fingerprint(current_password_hash),
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_reset_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+
+    if payload.get("purpose") != "password_reset":
+        return None
+
+    return payload
+
+
+# ---------- Token de acesso (sessão) ----------
+
+def create_access_token(user_id: int, current_password_hash: str) -> str:
+    payload = {
+        "sub": str(user_id),
+        "purpose": "access",
+        "fp": _fingerprint(current_password_hash),
+        "exp": datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_DAYS),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_access_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+
+    if payload.get("purpose") != "access":
+        return None
+
+    return payload

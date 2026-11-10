@@ -1,0 +1,328 @@
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    padding: 0;
+    font-family: Arial, Helvetica, sans-serif;
+    background-color: #f5f6f8;
+    color: #333;
+}
+
+
+.container {
+    width: 90%;
+    max-width: 900px;
+    margin: 50px auto;
+    padding: 40px;
+    background-color: #ffffff;
+    border-radius: 14px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+
+h1 {
+    margin: 0 0 10px;
+    color: #222;
+    font-size: 30px;
+    font-weight: 600;
+}
+
+h2 {
+    margin-top: 35px;
+    margin-bottom: 18px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #e5e5e5;
+    color: #333;
+    font-size: 20px;
+    font-weight: 600;
+}
+
+p {
+    color: #666;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+
+
+form {
+    width: 100%;
+    margin-top: 30px;
+}
+
+
+
+label {
+    display: block;
+    margin-bottom: 8px;
+    color: #444;
+    font-size: 15px;
+    font-weight: 600;
+}
+
+input[type="text"],
+input[type="number"],
+input[type="email"],
+input[type="url"],
+input[type="password"],
+textarea,
+select {
+    width: 100%;
+    padding: 12px 14px;
+
+    border: 1px solid #d4d4d4;
+    border-radius: 7px;
+
+    background-color: #fff;
+
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    color: #333;
+
+    outline: none;
+    transition:
+        border-color 0.2s ease,
+        box-shadow 0.2s ease;
+}
+
+textarea {
+    min-height: 120px;
+    resize: vertical;
+    line-height: 1.5;
+}
+
+input[type="text"]:focus,
+input[type="number"]:focus,
+input[type="email"]:focus,
+input[type="url"]:focus,
+input[type="password"]:focus,
+textarea:focus,
+select:focus {
+    border-color: #555;
+    box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.06);
+}
+
+
+
+input[type="file"] {
+    width: 100%;
+    padding: 10px;
+
+    border: 1px dashed #bbb;
+    border-radius: 7px;
+
+    background-color: #fafafa;
+
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 14px;
+    color: #555;
+
+    cursor: pointer;
+}
+
+input[type="file"]:hover {
+    border-color: #777;
+    background-color: #f7f7f7;
+}
+
+
+
+input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+    margin-right: 8px;
+
+    vertical-align: middle;
+
+    cursor: pointer;
+}
+
+
+
+label:has(input[type="checkbox"]) {
+    display: flex;
+    align-items: center;
+
+    margin-bottom: 10px;
+
+    font-weight: normal;
+    cursor: pointer;
+}
+
+
+button {
+    margin-top: 25px;
+    padding: 13px 28px;
+
+    border: none;
+    border-radius: 7px;
+
+    background-color: #333;
+    color: #fff;
+
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.2s ease,
+        transform 0.1s ease;
+}
+
+button:hover {
+    background-color: #555;
+}
+
+button:active {
+    transform: translateY(1px);
+}
+
+
+a {
+    color: #444;
+    font-size: 14px;
+    text-decoration: none;
+}
+
+a:hover {
+    text-decoration: underline;
+}
+
+.form-row {
+    display: flex;
+    align-items: center;
+    width: 100%;
+    gap: 10px;
+}
+
+.form-row input[type="text"] {
+    flex: 1;
+    height: 45px;
+}
+
+.form-row button {
+    height: 45px;
+    margin-top: 0;
+    padding: 0 25px;
+}
+
+
+
+.form-group {
+    margin-bottom: 22px;
+}
+
+
+
+.badge-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+
+    padding: 15px;
+
+    border: 1px solid #e2e2e2;
+    border-radius: 8px;
+
+    background-color: #fafafa;
+}
+
+.badge-list label {
+    margin: 0;
+    padding: 8px 10px;
+
+    border-radius: 6px;
+
+    transition: background-color 0.2s ease;
+}
+
+.badge-list label:hover {
+    background-color: #eeeeee;
+}
+
+
+
+@media (max-width: 700px) {
+
+    .container {
+        width: 94%;
+        margin: 25px auto;
+        padding: 25px;
+    }
+
+    h1 {
+        font-size: 25px;
+    }
+
+    h2 {
+        font-size: 18px;
+    }
+
+    .form-row {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-row button {
+        width: 100%;
+    }
+}
+
+.badge-list {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.badge-option {
+    display: flex;
+    align-items: center;
+
+    margin: 0;
+    padding: 14px 16px;
+
+    border: 1px solid #ddd;
+    border-radius: 8px;
+
+    background-color: #fafafa;
+
+    cursor: pointer;
+
+    transition:
+        background-color 0.2s ease,
+        border-color 0.2s ease;
+}
+
+.badge-option:hover {
+    background-color: #f0f0f0;
+    border-color: #aaa;
+}
+
+.badge-option input[type="checkbox"] {
+    width: 17px;
+    height: 17px;
+
+    margin: 0 10px 0 0;
+
+    cursor: pointer;
+}
+
+.badge-option span {
+    font-weight: normal;
+}
+
+
+
+@media (max-width: 600px) {
+
+    .badge-list {
+        grid-template-columns: 1fr;
+    }
+
+}

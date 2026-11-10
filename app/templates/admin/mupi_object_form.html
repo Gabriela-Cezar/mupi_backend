@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Cadastrar Objeto MUPI</title>
+
+    <link
+        rel="stylesheet"
+        href="/admin-static/style.css"
+    >
+</head>
+
+<body>
+
+<div class="container">
+
+    <h1>Cadastrar Objeto MUPI</h1>
+
+    <p>
+        Cadastre as informações, localização, insígnias e mídias
+        relacionadas ao objeto.
+    </p>
+
+
+    <form
+        action="/admin/mupi-objects"
+        method="post"
+        enctype="multipart/form-data"
+    >
+
+
+        <h2>Informações</h2>
+
+
+        <div class="form-group">
+
+            <label for="name">
+                Nome
+            </label>
+
+            <input
+                type="text"
+                id="name"
+                name="name"
+                placeholder="Nome do objeto MUPI"
+                required
+            >
+
+        </div>
+
+
+        <div class="form-group">
+
+            <label for="description">
+                Descrição
+            </label>
+
+            <textarea
+                id="description"
+                name="description"
+                rows="5"
+                placeholder="Descreva o objeto MUPI..."
+            ></textarea>
+
+        </div>
+
+        <h2>Localização</h2>
+
+
+        <div class="form-group">
+
+            <label for="latitude">
+                Latitude
+            </label>
+
+            <input
+                type="number"
+                id="latitude"
+                name="latitude"
+                step="any"
+                placeholder="Ex.: -16.6869"
+                required
+            >
+
+        </div>
+
+
+        <div class="form-group">
+
+            <label for="longitude">
+                Longitude
+            </label>
+
+            <input
+                type="number"
+                id="longitude"
+                name="longitude"
+                step="any"
+                placeholder="Ex.: -49.2648"
+                required
+            >
+
+        </div>
+
+
+
+        <h2>Status</h2>
+
+
+        <div class="form-group">
+
+            <label>
+                <input
+                    type="checkbox"
+                    name="active"
+                    value="true"
+                    checked
+                >
+
+                MUPI ativo
+            </label>
+
+        </div>
+
+
+        <h2>Insígnias</h2>
+
+
+        {% if badges %}
+
+            <div class="badge-list">
+
+                {% for badge in badges %}
+
+                    <label class="badge-option">
+
+                        <input
+                            type="checkbox"
+                            name="badge_ids"
+                            value="{{ badge.id }}"
+                        >
+
+                        <span>
+                            {{ badge.name }}
+                        </span>
+
+                    </label>
+
+                {% endfor %}
+
+            </div>
+
+        {% else %}
+
+            <p>
+                Nenhuma insígnia cadastrada.
+            </p>
+
+            <a href="/admin/badges">
+                Cadastrar uma insígnia
+            </a>
+
+        {% endif %}
+
+
+        <h2>Imagens</h2>
+
+
+        <div class="form-group">
+
+            <label for="images">
+                Selecione as imagens
+            </label>
+
+            <input
+                type="file"
+                id="images"
+                name="images"
+                accept="image/*"
+                multiple
+            >
+
+        </div>
+
+
+        <h2>Vídeos</h2>
+
+
+        <div class="form-group">
+
+            <label for="video_urls">
+                URLs dos vídeos
+            </label>
+
+            <textarea
+                id="video_urls"
+                name="video_urls"
+                rows="5"
+                placeholder="Uma URL por linha"
+            ></textarea>
+
+        </div>
+
+
+        <button type="submit">
+            Cadastrar MUPI
+        </button>
+
+
+    </form>
+
+
+    <br>
+
+    <a href="/admin/badges">
+        Cadastrar nova insígnia
+    </a>
+
+</div>
+
+</body>
+
+</html>
