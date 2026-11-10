@@ -428,13 +428,22 @@ def mupi_object_form(
     request: Request,
     db: Session = Depends(get_db)
 ):
-    badges = db.query(Badge).all()
+    # Só insígnias manuais são ligadas a um ponto; as de contagem valem para todos
+    badges = (
+        db.query(Badge)
+        .filter(Badge.rule_type == BadgeRule.MANUAL)
+        .order_by(Badge.name)
+        .all()
+    )
+
+    themes = db.query(Theme).order_by(Theme.name).all()
 
     return templates.TemplateResponse(
         request=request,
         name="admin/mupi_object_form.html",
         context={
-            "badges": badges
+            "badges": badges,
+            "themes": themes,
         }
     )
 
@@ -474,6 +483,15 @@ def create_mupi_object(
             raise HTTPException(
                 status_code=400,
                 detail="Uma ou mais insígnias informadas não existem."
+            )
+
+        if any(badge.rule_type != BadgeRule.MANUAL for badge in badges):
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Só insígnias do tipo 'visitar este ponto' podem ser "
+                    "ligadas a um ponto."
+                )
             )
 
     media_items = []
@@ -540,10 +558,23 @@ def create_mupi_object(
 
 
 @router.get("/badges")
-def badge_form(request: Request):
+def badge_form(
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    themes = db.query(Theme).order_by(Theme.name).all()
+
     return templates.TemplateResponse(
         request=request,
-        name="admin/badge_form.html"
+        name="admin/badge_form.html",
+        context={
+            "themes": themes,
+            "rules": [
+                (BadgeRule.MANUAL.value, "Visitar este ponto (ligada a um ponto MUPI)"),
+                (BadgeRule.VISIT_COUNT.value, "Visitar N pontos quaisquer"),
+                (BadgeRule.THEME_VISIT_COUNT.value, "Visitar N pontos de um tema"),
+            ],
+        }
     )
 
 

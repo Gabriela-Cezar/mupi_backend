@@ -9,7 +9,14 @@
 
 <body>
 
+<div class="container">
+
     <h1>Cadastrar Insígnia</h1>
+
+    <p>
+        Defina como a insígnia é conquistada. Insígnias do tipo
+        "visitar este ponto" são ligadas a um ponto no cadastro do MUPI.
+    </p>
 
     <form
         action="/admin/badges"
@@ -17,61 +24,121 @@
         enctype="multipart/form-data"
     >
 
-        <div>
-            <label for="name">
-                Nome
-            </label>
+        <h2>Informações</h2>
 
+        <div class="form-group">
+            <label for="name">Nome</label>
             <input
                 type="text"
                 id="name"
                 name="name"
+                maxlength="100"
+                placeholder="Ex.: Explorador Arte Deco"
                 required
             >
         </div>
 
-        <br>
-
-        <div>
-            <label for="description">
-                Descrição
-            </label>
-
+        <div class="form-group">
+            <label for="description">Descrição</label>
             <textarea
                 id="description"
                 name="description"
                 rows="5"
+                placeholder="Ex.: Visite 5 pontos do tema Arte Deco"
             ></textarea>
         </div>
 
-        <br>
-
-        <div>
-            <label for="image">
-                Imagem
-            </label>
-
+        <div class="form-group">
+            <label for="image">Imagem (PNG, JPEG ou WebP, até 5 MB)</label>
             <input
                 type="file"
                 id="image"
                 name="image"
-                accept="image/*"
+                accept="image/png,image/jpeg,image/webp"
             >
         </div>
 
-        <br>
+        <h2>Regra de conquista</h2>
 
-        <button type="submit">
-            Cadastrar Insígnia
-        </button>
+        <div class="form-group">
+            <label for="rule_type">Como a insígnia é conquistada</label>
+            <select id="rule_type" name="rule_type" required>
+                {% for value, label in rules %}
+                    <option value="{{ value }}">{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group" id="group-required-count" hidden>
+            <label for="required_count">Quantidade de pontos a visitar</label>
+            <input
+                type="number"
+                id="required_count"
+                name="required_count"
+                min="1"
+                step="1"
+                placeholder="Ex.: 5"
+            >
+        </div>
+
+        <div class="form-group" id="group-theme" hidden>
+            <label for="theme_id">Tema</label>
+
+            {% if themes %}
+                <select id="theme_id" name="theme_id">
+                    <option value="">Selecione um tema</option>
+                    {% for theme in themes %}
+                        <option value="{{ theme.id }}">{{ theme.name }}</option>
+                    {% endfor %}
+                </select>
+            {% else %}
+                <p>
+                    Nenhum tema cadastrado. Cadastre um tema antes de criar
+                    uma insígnia por tema.
+                </p>
+            {% endif %}
+        </div>
+
+        <button type="submit">Cadastrar Insígnia</button>
 
     </form>
 
     <br>
 
-    <a href="/admin/mupi-objects">
-        Voltar para cadastro de MUPI
-    </a>
+    <a href="/admin/mupi-objects">Voltar para cadastro de MUPI</a>
+
+</div>
+
+<script>
+    // Mostra só os campos que a regra escolhida usa.
+    // O servidor valida tudo de novo; isto é só para facilitar o preenchimento.
+    (function () {
+        const rule = document.getElementById("rule_type");
+        const countGroup = document.getElementById("group-required-count");
+        const themeGroup = document.getElementById("group-theme");
+        const count = document.getElementById("required_count");
+        const theme = document.getElementById("theme_id");
+
+        function update() {
+            const usesCount = rule.value !== "manual";
+            const usesTheme = rule.value === "theme_visit_count";
+
+            countGroup.hidden = !usesCount;
+            themeGroup.hidden = !usesTheme;
+
+            count.required = usesCount;
+            if (!usesCount) count.value = "";
+
+            if (theme) {
+                theme.required = usesTheme;
+                if (!usesTheme) theme.value = "";
+            }
+        }
+
+        rule.addEventListener("change", update);
+        update();
+    })();
+</script>
 
 </body>
 
