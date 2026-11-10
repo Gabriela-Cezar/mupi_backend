@@ -40,7 +40,6 @@ def create_theme(
             status_code=400,
             detail="Já existe um tema com esse nome."
         ) 
-        #COMENTÁRIO
 
     db.refresh(theme)
 
