@@ -39,7 +39,8 @@ def create_theme(
         raise HTTPException(
             status_code=400,
             detail="Já existe um tema com esse nome."
-        )
+        ) 
+        #COMENTÁRIO
 
     db.refresh(theme)
 
