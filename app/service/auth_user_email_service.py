@@ -53,12 +53,10 @@ def _validar(
 
         return False, f"Código de {nome} inválido.", None
 
-    del store[email]  # uso único
+    del store[email] 
 
     return True, "", dados
 
-
-# ---------- Cadastro ----------
 
 RESEND_COOLDOWN_SECONDS = 60
 
@@ -122,8 +120,6 @@ def verificar_codigo(
 
     return True, "E-mail verificado com sucesso.", dados["password_hash"]
 
-
-# ---------- Recuperação de senha ----------
 
 def gerar_codigo_recuperacao(email: str) -> str:
     codigo = _novo_codigo()

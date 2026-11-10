@@ -36,8 +36,6 @@ class CollectBadgeRequest(CheckInRequest):
     badge_id: int
 
 
-# ---------- Serialização ----------
-
 def serialize_rule(badge: Badge) -> dict:
     return {
         "type": badge.rule_type.value,
@@ -65,8 +63,6 @@ def serialize_collected(item: UserBadge) -> dict:
         ),
     }
 
-
-# ---------- Proximidade ----------
 
 def get_mupi_in_range(
     db: Session,
@@ -102,8 +98,6 @@ def get_mupi_in_range(
 
     return mupi
 
-
-# ---------- Perfil ----------
 
 @router.get("/me")
 def get_profile(
@@ -150,8 +144,6 @@ def get_profile(
         for badge in pending
     ]
 
-    # Só conta o que dá para conquistar: manuais ligadas a MUPIs ativos
-    # e todas as condicionais
     manual_total = (
         db.query(func.count(distinct(MupiObjectBadge.badge_id)))
         .select_from(MupiObjectBadge)
@@ -182,8 +174,6 @@ def get_profile(
     }
 
 
-# ---------- Check-in (visita) ----------
-
 @router.post("/me/visits")
 def check_in(
     data: CheckInRequest,
@@ -198,7 +188,6 @@ def check_in(
         new_visit, awarded = register_visit(db, user_id, mupi)
         db.commit()
     except IntegrityError:
-        # Duas requisições simultâneas: a outra registrou primeiro
         db.rollback()
         new_visit, awarded = False, []
 
@@ -210,8 +199,6 @@ def check_in(
         "awarded": [serialize_collected(item) for item in awarded],
     }
 
-
-# ---------- Coleta (insígnia manual) ----------
 
 @router.post("/me/badges")
 def collect_badge(
@@ -253,7 +240,6 @@ def collect_badge(
             ))
             db.flush()
 
-        # Coletar dentro do MUPI também conta como visita
         _, awarded = register_visit(db, user_id, mupi)
 
         db.commit()

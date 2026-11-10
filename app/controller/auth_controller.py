@@ -8,12 +8,6 @@ from app.core.security import (
     decode_reset_token,
     reset_token_matches,
 )
-
-from app.core.security import (
-    create_reset_token,
-    decode_reset_token,
-    reset_token_matches,
-)
 from app.database.database import get_db
 from app.service.auth_service import (
     authenticate_user,
@@ -25,6 +19,7 @@ from app.service.auth_service import (
 from app.service.auth_user_email_service import (
     gerar_codigo,
     gerar_codigo_recuperacao,
+    renovar_codigo,
     verificar_codigo,
     verificar_codigo_recuperacao,
 )
@@ -36,8 +31,6 @@ router = APIRouter(
     tags=["Autenticação"]
 )
 
-
-# ---------- Schemas ----------
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -67,8 +60,6 @@ class ResetPasswordRequest(BaseModel):
     reset_token: str
     password: str = Field(min_length=8, max_length=128)
 
-
-# ---------- Templates de e-mail ----------
 
 def _codigo_email_html(titulo: str, intro: str, codigo: str, aviso: str) -> str:
     return f"""
@@ -114,8 +105,6 @@ def recovery_email_html(codigo: str) -> str:
         aviso="Se você não solicitou a recuperação de senha, ignore este e-mail.",
     )
 
-
-# ---------- Cadastro ----------
 
 @router.post("/register")
 def register(
@@ -191,9 +180,6 @@ def verify_email(
         "email": user.email
     }
 
-
-# ---------- Login ----------
-
 @router.post("/login")
 def login(
     data: LoginRequest,
@@ -220,8 +206,6 @@ def login(
     }
 
 
-# ---------- Recuperação de senha ----------
-
 @router.post("/recovery-password")
 def recovery_password(
     data: RecoveryPasswordRequest,
@@ -240,7 +224,6 @@ def recovery_password(
             html_content=recovery_email_html(codigo),
         )
 
-    # Mesma resposta exista o e-mail ou não, para não revelar quem tem conta
     return {
         "message": "Se o e-mail estiver cadastrado, você receberá um código."
     }
@@ -296,6 +279,7 @@ def reset_password(
     db.commit()
 
     return {"message": "Senha alterada com sucesso."}
+
 
 class ResendVerificationRequest(BaseModel):
     email: EmailStr

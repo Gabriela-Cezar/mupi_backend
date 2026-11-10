@@ -18,9 +18,9 @@ from app.database.database import Base
 
 
 class BadgeRule(str, Enum):
-    MANUAL = "manual"                          # tocar na insígnia dentro de um MUPI
-    VISIT_COUNT = "visit_count"                # visitar N MUPIs quaisquer
-    THEME_VISIT_COUNT = "theme_visit_count"    # visitar N MUPIs de um tema
+    MANUAL = "manual"                        
+    VISIT_COUNT = "visit_count"              
+    THEME_VISIT_COUNT = "theme_visit_count" 
 
 
 class Badge(Base):
@@ -76,7 +76,6 @@ class Badge(Base):
 
     required_count = Column(Integer, nullable=True)
 
-    # RESTRICT: não deixa apagar um tema que ainda é condição de uma insígnia
     theme_id = Column(
         Integer,
         ForeignKey("themes.id", ondelete="RESTRICT"),

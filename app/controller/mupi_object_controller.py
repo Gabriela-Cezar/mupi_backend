@@ -25,7 +25,7 @@ from app.model.badge import Badge, BadgeRule
 from app.model.theme import Theme
 from app.model.midia import MediaType, MupiObjectMedia
 from app.model.mupi_object import MupiObject
-from app.model.mupi_object_badge import MupiObjectBadge  # noqa: F401  (registra a tabela de associação)
+from app.model.mupi_object_badge import MupiObjectBadge 
 
 
 logger = logging.getLogger(__name__)
@@ -49,9 +49,7 @@ MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_VIDEO_URL_LENGTH = 500
 
 
-# ---------- Helpers ----------
 def parse_optional_int(value: str | None, field: str) -> int | None:
-    # Formulários HTML mandam "" para campos numéricos vazios
     value = (value or "").strip()
 
     if not value:
@@ -79,7 +77,6 @@ def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
 
 def bounding_box(lat: float, lon: float, radius_m: float):
-    # Aproximação adequada para uso local (não trata o antimeridiano)
     delta_lat = math.degrees(radius_m / EARTH_RADIUS_M)
     cos_lat = max(math.cos(math.radians(lat)), 1e-6)
     delta_lon = math.degrees(radius_m / (EARTH_RADIUS_M * cos_lat))
@@ -92,7 +89,6 @@ def serialize_badge(badge: Badge) -> dict:
         "id": badge.id,
         "name": badge.name,
         "description": badge.description,
-        # image_mime_type só existe quando há imagem, então não carrega o blob
         "image_url": (
             f"/mupi-objects/badges/{badge.id}/image"
             if badge.image_mime_type
@@ -102,7 +98,6 @@ def serialize_badge(badge: Badge) -> dict:
 
 
 def serialize_media(media: MupiObjectMedia) -> dict:
-    # Sem url significa que o binário está no banco (data XOR url)
     return {
         "id": media.id,
         "object_id": media.object_id,
@@ -176,8 +171,6 @@ def is_valid_http_url(url: str) -> bool:
 
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
-
-# ---------- API pública: objetos ----------
 
 @mupi_object_api_router.get("")
 def get_mupi_objects(
@@ -405,8 +398,6 @@ def get_mupi_object_image(
     )
 
 
-# ---------- Admin (ainda sem autenticação) ----------
-
 @router.get("/search")
 def admin_search_mupi_objects(
     name: str = Query(..., min_length=1, max_length=100),
@@ -461,7 +452,7 @@ def create_mupi_object(
     db: Session = Depends(get_db),
     theme_id: str = Form(""),
 ):
-    # Validações primeiro, antes de tocar no banco
+
     badges = []
     
     parsed_theme_id = parse_optional_int(theme_id, "tema")
@@ -527,6 +518,7 @@ def create_mupi_object(
         latitude=latitude,
         longitude=longitude,
         active=active,
+        theme_id=parsed_theme_id,
         media=media_items,
         badges=badges
     )

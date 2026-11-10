@@ -14,7 +14,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from app.database.database import Base
-from app.model.theme import Theme  # noqa: F401  (registra o model para a relationship)
+from app.model.theme import Theme 
 
 
 class MupiObject(Base):

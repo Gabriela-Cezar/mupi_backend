@@ -100,7 +100,6 @@ def register_visit(
 
     db.add(UserVisit(user_id=user_id, object_id=mupi.id))
 
-    # Sua sessão tem autoflush desligado: sem isto, a contagem não enxerga a visita
     db.flush()
 
     return True, award_visit_badges(db, user_id, mupi.id)

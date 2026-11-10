@@ -6,7 +6,6 @@ from app.model.user import User
 
 password_hash = PasswordHash.recommended()
 
-# Hash fictício para equalizar o tempo de resposta quando o e-mail não existe
 _DUMMY_HASH = password_hash.hash("senha-ficticia-nao-usada")
 
 
@@ -39,7 +38,7 @@ def create_user(
     user = User(
         email=email,
         password_hash=hashed_password,
-        email_verified=True  # o usuário só é criado após confirmar o código
+        email_verified=True  
     )
 
     db.add(user)

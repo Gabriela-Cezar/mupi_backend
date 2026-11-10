@@ -22,11 +22,8 @@ def fingerprint_matches(payload: dict, current_password_hash: str) -> bool:
     )
 
 
-# Nome usado pelo auth_controller
 reset_token_matches = fingerprint_matches
 
-
-# ---------- Token de recuperação de senha ----------
 
 def create_reset_token(email: str, current_password_hash: str) -> str:
     payload = {
@@ -49,8 +46,6 @@ def decode_reset_token(token: str) -> dict | None:
 
     return payload
 
-
-# ---------- Token de acesso (sessão) ----------
 
 def create_access_token(user_id: int, current_password_hash: str) -> str:
     payload = {
