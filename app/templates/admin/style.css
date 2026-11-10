@@ -326,3 +326,26 @@ a:hover {
     }
 
 }
+
+/* Lista de temas cadastrados */
+.theme-list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.theme-list li {
+    padding: 12px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.theme-list li:last-child {
+    border-bottom: none;
+}
+
+.theme-list span {
+    display: block;
+    margin-top: 4px;
+    color: #666;
+    font-size: 14px;
+}
