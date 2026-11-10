@@ -6,6 +6,13 @@ from app.model.theme import Theme
 from app.model.user import User
 from app.service.badge_service import register_visit
 
+
+@pytest.fixture
+def client(admin_client):
+    """Todas as rotas deste arquivo são do painel: usa um admin logado."""
+    return admin_client
+
+
 URL = "/admin/mupi-objects"
 
 

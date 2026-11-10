@@ -349,3 +349,73 @@ a:hover {
     color: #666;
     font-size: 14px;
 }
+
+
+/* Barra do administrador (topo de todas as páginas do painel) */
+.admin-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 24px;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background-color: #222;
+    color: #eee;
+}
+
+.admin-nav {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+}
+
+.admin-nav a,
+.admin-bar .link-button {
+    color: #eee;
+    font-weight: 600;
+}
+
+.admin-user {
+    display: flex;
+    gap: 14px;
+    align-items: center;
+    font-size: 14px;
+}
+
+.inline-form {
+    display: inline;
+    width: auto;
+    margin: 0;
+}
+
+.link-button {
+    width: auto;
+    margin: 0;
+    padding: 0;
+    border: none;
+    background: none;
+    font-size: 14px;
+    text-decoration: underline;
+    cursor: pointer;
+}
+
+.link-button:hover {
+    background: none;
+    opacity: 0.8;
+}
+
+
+/* Página de login */
+.login-container {
+    max-width: 440px;
+}
+
+.alert-error {
+    margin: 20px 0 0;
+    padding: 12px 14px;
+    border: 1px solid #e3b4b4;
+    border-radius: 7px;
+    background-color: #fbeaea;
+    color: #8a1f1f;
+    font-size: 15px;
+}

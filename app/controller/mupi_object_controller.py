@@ -16,10 +16,11 @@ from fastapi import (
     Response,
     UploadFile,
 )
-from fastapi.templating import Jinja2Templates
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.core.admin_auth import require_admin_with_csrf
+from app.core.templates import templates
 from app.database.database import get_db
 from app.model.badge import Badge, BadgeRule
 from app.model.theme import Theme
@@ -30,18 +31,16 @@ from app.model.mupi_object_badge import MupiObjectBadge
 
 logger = logging.getLogger(__name__)
 
+# Todas as rotas do painel exigem login (e token CSRF nos envios)
 router = APIRouter(
     prefix="/admin",
-    tags=["Administração"]
+    tags=["Administração"],
+    dependencies=[Depends(require_admin_with_csrf)]
 )
 
 mupi_object_api_router = APIRouter(
     prefix="/mupi-objects",
     tags=["Objetos MUPI"]
-)
-
-templates = Jinja2Templates(
-    directory="app/templates"
 )
 
 EARTH_RADIUS_M = 6_371_000

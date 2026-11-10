@@ -7,6 +7,7 @@ from fastapi.staticfiles import StaticFiles
 from app.controller.email_controller import router as email_router
 from app.controller.auth_controller import router as auth_router
 from app.controller.user_controller import router as user_router
+from app.controller.admin_auth_controller import router as admin_auth_router
 from app.controller.admin_theme_controller import router as admin_theme_router
 from app.controller.mupi_object_controller import (
     router as mupi_object_router,
@@ -19,6 +20,7 @@ app.include_router(user_router)
 
 BASE_DIR = Path(__file__).resolve().parent
 
+app.include_router(admin_auth_router)
 app.include_router(admin_theme_router)
 
 app.mount(

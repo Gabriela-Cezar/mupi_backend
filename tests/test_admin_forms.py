@@ -6,6 +6,12 @@ from app.model.theme import Theme
 
 
 @pytest.fixture
+def client(admin_client):
+    """Todas as rotas deste arquivo são do painel: usa um admin logado."""
+    return admin_client
+
+
+@pytest.fixture
 def tema(db_session):
     tema = Theme(name="Arte Deco")
     db_session.add(tema)

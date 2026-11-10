@@ -1,0 +1,20 @@
+{% if current_admin %}
+<header class="admin-bar">
+
+    <nav class="admin-nav">
+        <a href="/admin/mupi-objects">Pontos MUPI</a>
+        <a href="/admin/badges">Insígnias</a>
+        <a href="/admin/themes/new">Temas</a>
+    </nav>
+
+    <div class="admin-user">
+        <span>{{ current_admin.email }}</span>
+
+        <form action="/admin/logout" method="post" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="link-button">Sair</button>
+        </form>
+    </div>
+
+</header>
+{% endif %}

@@ -9,6 +9,7 @@ from app.core.config import SECRET_KEY
 ALGORITHM = "HS256"
 RESET_TOKEN_MINUTES = 10
 ACCESS_TOKEN_DAYS = 7
+ADMIN_SESSION_HOURS = 12
 
 
 def _fingerprint(password_hash: str) -> str:
@@ -67,3 +68,35 @@ def decode_access_token(token: str) -> dict | None:
         return None
 
     return payload
+
+# ---------- Sessão do painel administrativo ----------
+
+def create_admin_session_token(admin_id: int, current_password_hash: str) -> str:
+    payload = {
+        "sub": str(admin_id),
+        "purpose": "admin_session",
+        "fp": _fingerprint(current_password_hash),
+        "exp": datetime.now(timezone.utc) + timedelta(hours=ADMIN_SESSION_HOURS),
+    }
+    return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
+
+
+def decode_admin_session_token(token: str) -> dict | None:
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+    except jwt.PyJWTError:
+        return None
+
+    if payload.get("purpose") != "admin_session":
+        return None
+
+    return payload
+
+
+def csrf_token_for(session_token: str) -> str:
+    """Token CSRF ligado à sessão: muda a cada login e não precisa ser guardado."""
+    return hmac.new(
+        SECRET_KEY.encode(),
+        f"csrf:{session_token}".encode(),
+        hashlib.sha256
+    ).hexdigest()

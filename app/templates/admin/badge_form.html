@@ -9,6 +9,8 @@
 
 <body>
 
+{% include "admin/_admin_header.html" %}
+
 <div class="container">
 
     <h1>Cadastrar Insígnia</h1>
@@ -23,6 +25,8 @@
         method="post"
         enctype="multipart/form-data"
     >
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
         <h2>Informações</h2>
 

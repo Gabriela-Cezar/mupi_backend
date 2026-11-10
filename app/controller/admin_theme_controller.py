@@ -1,21 +1,18 @@
-from pathlib import Path
-
 from fastapi import APIRouter, Depends, Form, HTTPException, Request
-from fastapi.templating import Jinja2Templates
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.core.admin_auth import require_admin_with_csrf
+from app.core.templates import templates
 from app.database.database import get_db
 from app.model.theme import Theme
 
+# Todas as rotas exigem login (e token CSRF nos envios)
 router = APIRouter(
     prefix="/admin/themes",
-    tags=["Administração"]
-)
-
-templates = Jinja2Templates(
-    directory=Path(__file__).resolve().parent.parent / "templates"
+    tags=["Administração"],
+    dependencies=[Depends(require_admin_with_csrf)]
 )
 
 

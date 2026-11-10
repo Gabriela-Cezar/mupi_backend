@@ -2,6 +2,13 @@ import pytest
 
 from app.model.theme import Theme
 
+
+@pytest.fixture
+def client(admin_client):
+    """Todas as rotas deste arquivo são do painel: usa um admin logado."""
+    return admin_client
+
+
 URL = "/admin/themes"
 
 
