@@ -419,3 +419,13 @@ a:hover {
     color: #8a1f1f;
     font-size: 15px;
 }
+
+.alert-success {
+    margin: 20px 0 0;
+    padding: 12px 14px;
+    border: 1px solid #b4dcc0;
+    border-radius: 7px;
+    background-color: #eaf7ee;
+    color: #1f6a35;
+    font-size: 15px;
+}
