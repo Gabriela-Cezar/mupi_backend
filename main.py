@@ -1,9 +1,10 @@
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from app.core.config import CORS_ALLOWED_ORIGIN_REGEX, CORS_ALLOWED_ORIGINS
+from app.core.cors import add_cors, parse_origins
 from app.controller.email_controller import router as email_router
 from app.controller.auth_controller import router as auth_router
 from app.controller.user_controller import router as user_router
@@ -30,12 +31,11 @@ app.mount(
 )
 
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# Só os sites configurados no .env podem chamar a API pelo navegador (FAL-09)
+add_cors(
+    app,
+    origins=parse_origins(CORS_ALLOWED_ORIGINS),
+    origin_regex=CORS_ALLOWED_ORIGIN_REGEX,
 )
 
 

@@ -4,6 +4,9 @@ os.environ["DATABASE_URL"] = "sqlite://"
 os.environ["RESEND_API_KEY"] = "re_teste"
 os.environ["EMAIL_FROM"] = "MUPI Testes <teste@exemplo.com>"
 os.environ["SECRET_KEY"] = "chave-secreta-apenas-para-testes"
+# Como em produção: nenhum site de fora liberado no CORS
+os.environ["CORS_ALLOWED_ORIGINS"] = ""
+os.environ.pop("CORS_ALLOWED_ORIGIN_REGEX", None)
 
 from datetime import timedelta  # noqa: E402
 
