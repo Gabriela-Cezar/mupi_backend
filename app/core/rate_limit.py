@@ -70,6 +70,11 @@ class RateLimiter:
             self._hits.setdefault(key, deque()).append(now)
             return 0
 
+    def forget(self, key: Hashable) -> None:
+        """Esquece os registros de uma chave (ex.: login certo zera as falhas)."""
+        with self._lock:
+            self._hits.pop(key, None)
+
     def reset(self) -> None:
         with self._lock:
             self._hits.clear()

@@ -20,6 +20,11 @@ LIMITADORES_DE_EMAIL = (
     auth_controller.recovery_email_limiter,
     auth_controller.email_ip_limiter,
 )
+
+LIMITADORES_DE_LOGIN = (
+    auth_controller.login_ip_email_limiter,
+    auth_controller.login_ip_limiter,
+)
 from app.core import admin_auth  # noqa: E402
 from app.core.security import create_access_token, csrf_token_for  # noqa: E402
 from app.database.database import Base, get_db  # noqa: E402
@@ -40,13 +45,13 @@ USUARIO_EMAIL = "usuario@exemplo.com"
 
 @pytest.fixture(autouse=True)
 def limpar_estado_em_memoria():
-    """Cada teste começa sem códigos pendentes, tentativas de login nem
-    contagem de envios de e-mail."""
+    """Cada teste começa sem códigos pendentes, tentativas de login (app e
+    painel) nem contagem de envios de e-mail."""
     def limpar():
         codigos.codigos_verificacao.clear()
         codigos.codigos_recuperacao.clear()
         admin_auth._failed_logins.clear()
-        for limiter in LIMITADORES_DE_EMAIL:
+        for limiter in LIMITADORES_DE_EMAIL + LIMITADORES_DE_LOGIN:
             limiter.reset()
 
     limpar()

@@ -64,6 +64,21 @@ def _limit_email_requests_by_ip(request: Request) -> None:
         )
 
 
+# ---------- Limite de tentativas de login (FAL-08) ----------
+
+LOGIN_WINDOW_SECONDS = 15 * 60
+
+# Mesmo e-mail a partir da mesma rede: alguém tentando adivinhar uma senha.
+# Não há limite por e-mail de qualquer rede: senão, errar de propósito
+# trancaria a conta de outra pessoa.
+LOGIN_FAILURES_PER_IP_AND_EMAIL = 5
+login_ip_email_limiter = RateLimiter(LOGIN_FAILURES_PER_IP_AND_EMAIL, LOGIN_WINDOW_SECONDS)
+
+# Mesma rede, qualquer e-mail: alguém testando senhas vazadas em muitas contas
+LOGIN_FAILURES_PER_IP = 20
+login_ip_limiter = RateLimiter(LOGIN_FAILURES_PER_IP, LOGIN_WINDOW_SECONDS)
+
+
 def _code_cooldown(wait: int) -> HTTPException:
     return too_many_requests(
         wait,
@@ -233,8 +248,26 @@ def verify_email(
 @router.post("/login")
 def login(
     data: LoginRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
+    ip = _client_ip(request)
+    ip_and_email = (ip, normalize_email(data.email))
+
+    # Bloqueado responde 429 mesmo com a senha certa: senão o atacante
+    # saberia que acertou
+    wait = max(
+        login_ip_email_limiter.retry_after(ip_and_email),
+        login_ip_limiter.retry_after(ip),
+    )
+
+    if wait:
+        raise too_many_requests(
+            wait,
+            "Muitas tentativas de login. "
+            f"Aguarde {format_wait(wait)} e tente novamente."
+        )
+
     user = authenticate_user(
         db=db,
         email=data.email,
@@ -242,10 +275,16 @@ def login(
     )
 
     if user is None:
+        login_ip_email_limiter.record(ip_and_email)
+        login_ip_limiter.record(ip)
+
         raise HTTPException(
             status_code=401,
             detail="E-mail ou senha inválidos"
         )
+
+    # Login certo zera as falhas deste e-mail nesta rede
+    login_ip_email_limiter.forget(ip_and_email)
 
     return {
         "message": "Login realizado com sucesso",
