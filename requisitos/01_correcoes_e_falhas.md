@@ -121,6 +121,7 @@ Cada item traz: onde está, o problema, o impacto e o que deve ser feito.
 - **Correção:** centralizar em `config.py`, junto com as novas configurações (distância de proximidade, origens CORS, armazenamento, Google).
 
 ### FAL-19 — Falta lista de dependências [MVP]
+- **Situação:** ✅ Resolvida (`requirements.txt` e `requirements-dev.txt`, testados num ambiente Python limpo; o README do INF-02 continua pendente)
 - **Correção:** criar `requirements.txt` (ou `pyproject.toml`) com versões fixas (ver INF-02).
 
 ### FAL-20 — Não existem testes automatizados [MVP]

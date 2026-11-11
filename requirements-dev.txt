@@ -1,0 +1,8 @@
+# Dependências para desenvolver e rodar os testes.
+#   pip install -r requirements-dev.txt
+#   python -m pytest
+
+-r requirements.txt
+
+pytest==9.2.0
+httpx==0.28.1                # usado pelo TestClient do FastAPI nos testes

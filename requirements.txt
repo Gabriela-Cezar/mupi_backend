@@ -1,0 +1,32 @@
+# Dependências do backend MUPI (produção).
+# Versões fixas: as mesmas com que os testes passam. Para instalar:
+#   pip install -r requirements.txt
+# Para desenvolver e rodar os testes, use requirements-dev.txt.
+#
+# Python 3.11
+
+# Servidor web e API
+fastapi==0.141.1
+starlette==1.6.0             # importado diretamente (UploadFile)
+uvicorn==0.53.0              # roda o servidor: uvicorn main:app
+pydantic==2.13.4
+email-validator==2.3.0       # validação dos campos EmailStr
+python-multipart==0.0.32     # formulários e envio de arquivos do painel
+Jinja2==3.1.4                # templates HTML do painel
+
+# Banco de dados (PostgreSQL)
+SQLAlchemy==2.0.52
+psycopg2-binary==2.9.13      # driver do PostgreSQL usado pelo SQLAlchemy
+
+# Configuração
+python-dotenv==0.21.0        # lê o arquivo .env
+
+# Autenticação
+PyJWT==2.8.0                 # tokens de sessão e de recuperação de senha
+pwdlib==0.3.1                # criptografia das senhas
+argon2-cffi==25.1.0          # algoritmo Argon2 usado pelo pwdlib
+
+# Serviços externos
+resend==2.44.0               # envio de e-mails
+requests==2.34.2             # chamadas ao OpenRouteService (rota a pé)
+polyline==2.0.4              # decodifica o trajeto devolvido pelo OpenRouteService
