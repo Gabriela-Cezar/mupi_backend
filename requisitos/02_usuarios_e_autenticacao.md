@@ -9,7 +9,7 @@ O login é **obrigatório** para usar o app: todas as rotas usadas pelo app, exc
 
 - Cadastro por e-mail e senha, com código de 6 dígitos enviado por e-mail (válido 10 min, 5 tentativas).
 - Usuário só é criado depois de confirmar o código.
-- Login devolve token JWT válido por 7 dias.
+- Login devolve token JWT válido por 7 dias (passará a 30 dias renováveis — USR-11).
 - Recuperação de senha: código por e-mail → `reset_token` de 10 min → nova senha.
 - Trocar a senha invalida os tokens antigos.
 
@@ -45,6 +45,7 @@ O login é **obrigatório** para usar o app: todas as rotas usadas pelo app, exc
 - Hoje o token carrega uma "impressão digital" do hash da senha. Contas só Google não têm senha.
 - Substituir por um campo `users.token_version` (inteiro). O token carrega a versão; o servidor rejeita tokens com versão diferente.
 - Incrementar `token_version` ao trocar a senha, ao redefinir a senha e ao excluir a conta.
+- Com as sessões longas da USR-11, este é o único jeito de cancelar um token antes de ele expirar — por isso é pré-requisito da USR-11.
 - O `reset_token` de recuperação continua de uso único (pode usar a mesma versão).
 
 ### USR-06 — Recuperação de senha [MVP]
@@ -76,9 +77,24 @@ O login é **obrigatório** para usar o app: todas as rotas usadas pelo app, exc
 - Exceção: rotas de `/auth`.
 - Arquivos (foto/áudio) são servidos por link assinado do S3, que só é entregue a usuários logados (ver `08_infraestrutura.md`, INF-04).
 
-### USR-11 — Renovação do token [DESEJÁVEL]
-- Hoje o token dura 7 dias e depois o usuário precisa entrar de novo.
-- Avaliar uma rota `POST /auth/refresh` para renovar o token enquanto o usuário usa o app, evitando novo login a cada semana.
+### USR-11 — Sessão renovada a cada uso [MVP — decidido em 11/11/2026]
+- **Problema:** hoje o token dura 7 dias fixos. Num app de celular usado de vez em quando (passeios), quase toda visita começaria com um novo login.
+- **Decisão:** sessão "deslizante". O token passa a valer **30 dias** e é trocado por um novo a cada vez que o app é aberto. Quem usa o app ao menos uma vez a cada 30 dias nunca precisa entrar de novo; quem fica mais tempo sem abrir faz login.
+- **Alternativas descartadas:** só aumentar o prazo (token copiado valeria meses) e o par token de acesso + token de renovação guardado no servidor (mais seguro, porém mais trabalhoso e desnecessário para o risco do MUPI, que não guarda pagamentos nem dados sensíveis).
+- **Mudanças:**
+  - `ACCESS_TOKEN_DAYS` de 7 para **30** (`app/core/security.py`).
+  - Nova rota **`POST /auth/refresh`** (exige o token atual no cabeçalho `Authorization`):
+    - token válido, usuário ativo e `token_version` igual → **200** com um token novo de 30 dias (mesmo formato da resposta do login: `access_token`, `token_type`, `user_id`, `email`);
+    - token expirado, adulterado, de usuário inativo ou com `token_version` antiga → **401**.
+  - O token antigo continua válido até expirar (não há lista de tokens no servidor); o cancelamento antecipado é feito pelo `token_version` (USR-05).
+  - Limite de chamadas por usuário (ex.: 30 por hora), para a rota não ser usada em excesso (INF-08).
+- **Depende de:** USR-05 (`token_version`).
+- **Testes:** renovação com token válido; recusa com token expirado, adulterado, de outro tipo (reset de senha, sessão do painel), de usuário inativo e após troca de senha; o token novo funciona nas rotas do app e vale 30 dias.
+- **Impacto no app:** o app chama `/auth/refresh` ao abrir (APP-AUT-05). A mesma chamada confere se a sessão ainda vale.
+
+### USR-13 — Sair de todos os aparelhos [DESEJÁVEL]
+- Rota que incrementa o `token_version` do usuário, encerrando a sessão em todos os aparelhos (útil se o celular for perdido).
+- O "Sair" comum do app só apaga o token do aparelho (APP-AUT-06).
 
 ### USR-12 — Outros provedores de login [FUTURO]
 - Login com Apple. Atenção: a App Store costuma exigir "Entrar com a Apple" quando o app oferece login com Google. Verificar antes da publicação no iOS.

@@ -1,7 +1,8 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
+from app.core.rate_limit import RateLimiter, format_wait, too_many_requests
 from app.core.security import (
     create_access_token,
     create_reset_token,
@@ -17,6 +18,7 @@ from app.service.auth_service import (
     normalize_email,
 )
 from app.service.auth_user_email_service import (
+    RESEND_COOLDOWN_SECONDS,
     gerar_codigo,
     gerar_codigo_recuperacao,
     renovar_codigo,
@@ -30,6 +32,43 @@ router = APIRouter(
     prefix="/auth",
     tags=["Autenticação"]
 )
+
+
+# ---------- Limite de envio de e-mails (FAL-07) ----------
+
+# Por e-mail: um código a cada 60 s (o reenvio já tem o próprio intervalo)
+register_email_limiter = RateLimiter(1, RESEND_COOLDOWN_SECONDS)
+recovery_email_limiter = RateLimiter(1, RESEND_COOLDOWN_SECONDS)
+
+# Por IP: soma cadastro, recuperação e reenvio, para o servidor não ser usado
+# para mandar e-mails a muitos endereços
+EMAIL_REQUESTS_PER_IP = 10
+EMAIL_REQUESTS_WINDOW_SECONDS = 15 * 60
+email_ip_limiter = RateLimiter(EMAIL_REQUESTS_PER_IP, EMAIL_REQUESTS_WINDOW_SECONDS)
+
+
+def _client_ip(request: Request) -> str:
+    # Atrás de um proxy (Nginx na AWS), o uvicorn precisa de --proxy-headers
+    # para este ser o IP real do usuário (INF-05)
+    return request.client.host if request.client else "desconhecido"
+
+
+def _limit_email_requests_by_ip(request: Request) -> None:
+    wait = email_ip_limiter.hit(_client_ip(request))
+
+    if wait:
+        raise too_many_requests(
+            wait,
+            "Muitas solicitações de código a partir desta rede. "
+            f"Aguarde {format_wait(wait)} e tente novamente."
+        )
+
+
+def _code_cooldown(wait: int) -> HTTPException:
+    return too_many_requests(
+        wait,
+        f"Aguarde {format_wait(wait)} para pedir outro código."
+    )
 
 
 class RegisterRequest(BaseModel):
@@ -109,8 +148,11 @@ def recovery_email_html(codigo: str) -> str:
 @router.post("/register")
 def register(
     data: RegisterRequest,
+    request: Request,
     db: Session = Depends(get_db)
 ):
+    _limit_email_requests_by_ip(request)
+
     email = normalize_email(data.email)
 
     if get_user_by_email(db, email):
@@ -118,6 +160,11 @@ def register(
             status_code=400,
             detail="E-mail já cadastrado"
         )
+
+    wait = register_email_limiter.retry_after(email)
+
+    if wait:
+        raise _code_cooldown(wait)
 
     hashed_password = gerar_password_hash(data.password)
 
@@ -133,10 +180,13 @@ def register(
     )
 
     if not enviado:
+        # Não conta o intervalo: o usuário pode tentar de novo na hora
         raise HTTPException(
             status_code=503,
             detail="Não foi possível enviar o e-mail. Tente novamente."
         )
+
+    register_email_limiter.record(email)
 
     return {
         "message": "Código de verificação enviado para o e-mail.",
@@ -209,9 +259,19 @@ def login(
 @router.post("/recovery-password")
 def recovery_password(
     data: RecoveryPasswordRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db)
 ):
+    _limit_email_requests_by_ip(request)
+
+    # O intervalo vale para qualquer e-mail, com conta ou não: se valesse só
+    # para quem tem conta, o 429 revelaria quem está cadastrado
+    wait = recovery_email_limiter.hit(normalize_email(data.email))
+
+    if wait:
+        raise _code_cooldown(wait)
+
     user = get_user_by_email(db, data.email)
 
     if user is not None:
@@ -288,8 +348,11 @@ class ResendVerificationRequest(BaseModel):
 @router.post("/resend-verification")
 def resend_verification(
     data: ResendVerificationRequest,
+    request: Request,
     background_tasks: BackgroundTasks
 ):
+    _limit_email_requests_by_ip(request)
+
     email = normalize_email(data.email)
 
     codigo, espera = renovar_codigo(email)

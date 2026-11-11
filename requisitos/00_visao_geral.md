@@ -53,6 +53,7 @@ O usuário anda pela cidade guiado pelo aplicativo e visita pontos turísticos e
 | Visitas durante rota | Visitar pontos fora da rota vale normalmente |
 | Insígnias | Coletadas automaticamente; ficam com o usuário mesmo que o ponto seja removido |
 | Login social | Conta Google |
+| Duração da sessão no app | 30 dias, renovada a cada abertura do app (quem usa não precisa entrar de novo) — USR-11 |
 | Exclusão de conta | Permitida |
 | Histórico | Só a lista de pontos visitados |
 | Ranking / compartilhamento / notificações | Não, por enquanto |
