@@ -1,5 +1,4 @@
 import logging
-import math
 import os
 from urllib.parse import urlparse
 
@@ -16,17 +15,35 @@ from fastapi import (
     Response,
     UploadFile,
 )
+from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, selectinload
+from starlette.datastructures import UploadFile as StarletteUploadFile
+from sqlalchemy.orm import Session
 
+from app.controller.serializers import (
+    mupi_load_options,
+    serialize_collected,
+    serialize_content,
+    serialize_summary,
+)
 from app.core.admin_auth import require_admin_with_csrf
+from app.core.dependencies import get_current_user
 from app.core.templates import templates
 from app.database.database import get_db
 from app.model.badge import Badge, BadgeRule
 from app.model.theme import Theme
 from app.model.midia import MediaType, MupiObjectMedia
 from app.model.mupi_object import MupiObject
-from app.model.mupi_object_badge import MupiObjectBadge 
+from app.model.mupi_object_badge import MupiObjectBadge  # noqa: F401  (registra a tabela de associação)
+from app.model.user import User
+from app.model.user_visit import UserVisit
+from app.service.badge_service import register_visit, visit_counts
+from app.service.proximity_service import (
+    bounding_box,
+    get_active_mupi,
+    get_mupi_in_range,
+    haversine_m,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -38,12 +55,13 @@ router = APIRouter(
     dependencies=[Depends(require_admin_with_csrf)]
 )
 
+# Rotas do aplicativo: todas exigem login (USR-10 / FAL-06)
 mupi_object_api_router = APIRouter(
     prefix="/mupi-objects",
-    tags=["Objetos MUPI"]
+    tags=["Objetos MUPI"],
+    dependencies=[Depends(get_current_user)]
 )
 
-EARTH_RADIUS_M = 6_371_000
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 MAX_VIDEO_URL_LENGTH = 500
 
@@ -62,75 +80,6 @@ def parse_optional_int(value: str | None, field: str) -> int | None:
             detail=f"Valor inválido para {field}."
         )
         
-def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    phi1, phi2 = math.radians(lat1), math.radians(lat2)
-    d_phi = phi2 - phi1
-    d_lambda = math.radians(lon2 - lon1)
-
-    a = (
-        math.sin(d_phi / 2) ** 2
-        + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
-    )
-
-    return 2 * EARTH_RADIUS_M * math.asin(math.sqrt(a))
-
-
-def bounding_box(lat: float, lon: float, radius_m: float):
-    delta_lat = math.degrees(radius_m / EARTH_RADIUS_M)
-    cos_lat = max(math.cos(math.radians(lat)), 1e-6)
-    delta_lon = math.degrees(radius_m / (EARTH_RADIUS_M * cos_lat))
-
-    return lat - delta_lat, lat + delta_lat, lon - delta_lon, lon + delta_lon
-
-
-def serialize_badge(badge: Badge) -> dict:
-    return {
-        "id": badge.id,
-        "name": badge.name,
-        "description": badge.description,
-        "image_url": (
-            f"/mupi-objects/badges/{badge.id}/image"
-            if badge.image_mime_type
-            else None
-        ),
-    }
-
-
-def serialize_media(media: MupiObjectMedia) -> dict:
-    return {
-        "id": media.id,
-        "object_id": media.object_id,
-        "type": media.type.value,
-        "url": media.url or f"/mupi-objects/media/{media.id}",
-        "title": media.title,
-        "description": media.description,
-    }
-
-
-def serialize_object(obj: MupiObject, distance: float | None = None) -> dict:
-    data = {
-        "id": obj.id,
-        "name": obj.name,
-        "description": obj.description,
-        "latitude": obj.latitude,
-        "longitude": obj.longitude,
-        "active": obj.active,
-        "badges": [serialize_badge(b) for b in obj.badges],
-        "media": [serialize_media(m) for m in obj.media],
-    }
-
-    if distance is not None:
-        data["distance"] = round(distance, 2)
-
-    return data
-
-
-def object_load_options():
-     return (
-        selectinload(MupiObject.badges),
-        selectinload(MupiObject.media),
-    )
-
 def sniff_image_mime(data: bytes) -> str | None:
     """Detecta o tipo real pelo conteúdo, sem confiar no que o cliente declarou."""
     if data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -171,18 +120,32 @@ def is_valid_http_url(url: str) -> bool:
     return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 
+# ---------- API do app: resumo (mapa, próximos, busca) ----------
+
+def visited_ids(db: Session, user_id: int) -> set[int]:
+    return {
+        object_id
+        for (object_id,) in db.query(UserVisit.object_id)
+        .filter(UserVisit.user_id == user_id)
+    }
+
+
 @mupi_object_api_router.get("")
 def get_mupi_objects(
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     objects = (
         db.query(MupiObject)
-        .options(*object_load_options())
+        .options(*mupi_load_options())
         .filter(MupiObject.active.is_(True))
+        .order_by(MupiObject.name)
         .all()
     )
 
-    return [serialize_object(obj) for obj in objects]
+    visited = visited_ids(db, user.id)
+
+    return [serialize_summary(obj, obj.id in visited) for obj in objects]
 
 
 @mupi_object_api_router.get("/nearby")
@@ -190,13 +153,14 @@ def get_nearby_mupi_objects(
     latitude: float = Query(..., ge=-90, le=90),
     longitude: float = Query(..., ge=-180, le=180),
     radius: float = Query(..., gt=0, le=50_000),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     min_lat, max_lat, min_lng, max_lng = bounding_box(latitude, longitude, radius)
 
     objects = (
         db.query(MupiObject)
-        .options(*object_load_options())
+        .options(*mupi_load_options())
         .filter(
             MupiObject.active.is_(True),
             MupiObject.latitude.between(min_lat, max_lat),
@@ -205,13 +169,14 @@ def get_nearby_mupi_objects(
         .all()
     )
 
+    visited = visited_ids(db, user.id)
     results = []
 
     for obj in objects:
         distance = haversine_m(latitude, longitude, obj.latitude, obj.longitude)
 
         if distance <= radius:
-            results.append(serialize_object(obj, distance))
+            results.append(serialize_summary(obj, obj.id in visited, distance))
 
     results.sort(key=lambda item: item["distance"])
 
@@ -223,11 +188,12 @@ def search_mupi_objects(
     name: str = Query(..., min_length=1, max_length=100),
     latitude: float = Query(..., ge=-90, le=90),
     longitude: float = Query(..., ge=-180, le=180),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     objects = (
         db.query(MupiObject)
-        .options(*object_load_options())
+        .options(*mupi_load_options())
         .filter(
             MupiObject.active.is_(True),
             MupiObject.name.ilike(f"%{name}%"),
@@ -236,9 +202,12 @@ def search_mupi_objects(
         .all()
     )
 
+    visited = visited_ids(db, user.id)
+
     results = [
-        serialize_object(
+        serialize_summary(
             obj,
+            obj.id in visited,
             haversine_m(latitude, longitude, obj.latitude, obj.longitude)
         )
         for obj in objects
@@ -249,6 +218,46 @@ def search_mupi_objects(
     return results
 
 
+# ---------- API do app: abrir o ponto (conteúdo completo + visita) ----------
+
+class OpenMupiRequest(BaseModel):
+    latitude: float = Field(ge=-90, le=90)
+    longitude: float = Field(ge=-180, le=180)
+
+
+@mupi_object_api_router.post("/{object_id}/open")
+def open_mupi_object(
+    object_id: int,
+    data: OpenMupiRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Abre o ponto: confere a proximidade, registra a visita e entrega o conteúdo."""
+    user_id = user.id
+
+    mupi = get_mupi_in_range(db, object_id, data.latitude, data.longitude)
+
+    try:
+        new_visit, awarded = register_visit(db, user_id, mupi)
+        db.commit()
+    except IntegrityError:
+        # Duas aberturas simultâneas: a outra registrou a visita primeiro
+        db.rollback()
+        new_visit, awarded = False, []
+
+    awarded_data = [serialize_collected(item) for item in awarded]
+    visits_total, _ = visit_counts(db, user_id)
+
+    mupi = get_active_mupi(db, object_id, mupi_load_options())
+
+    return {
+        **serialize_content(mupi),
+        "new_visit": new_visit,
+        "visits_total": visits_total,
+        "awarded": awarded_data,
+    }
+
+
 @mupi_object_api_router.get("/{object_id}/route")
 def get_mupi_route(
     object_id: int,
@@ -256,20 +265,7 @@ def get_mupi_route(
     longitude: float = Query(..., ge=-180, le=180),
     db: Session = Depends(get_db)
 ):
-    mupi = (
-        db.query(MupiObject)
-        .filter(
-            MupiObject.id == object_id,
-            MupiObject.active.is_(True)
-        )
-        .first()
-    )
-
-    if not mupi:
-        raise HTTPException(
-            status_code=404,
-            detail="MUPI não encontrado."
-        )
+    mupi = get_active_mupi(db, object_id)
 
     api_key = os.getenv("OPENROUTESERVICE_API_KEY")
 
@@ -367,7 +363,7 @@ def get_badge_image(
     return Response(
         content=badge.image,
         media_type=badge.image_mime_type or "image/png",
-        headers={"Cache-Control": "public, max-age=86400"}
+        headers={"Cache-Control": "private, max-age=86400"}
     )
 
 
@@ -378,7 +374,9 @@ def get_mupi_object_image(
 ):
     media = (
         db.query(MupiObjectMedia)
+        .join(MupiObject, MupiObject.id == MupiObjectMedia.object_id)
         .filter(
+            MupiObject.active.is_(True),
             MupiObjectMedia.object_id == object_id,
             MupiObjectMedia.type == MediaType.IMAGE,
             MupiObjectMedia.data.isnot(None)
@@ -393,7 +391,7 @@ def get_mupi_object_image(
     return Response(
         content=media.data,
         media_type=media.mime_type or "image/png",
-        headers={"Cache-Control": "public, max-age=3600"}
+        headers={"Cache-Control": "private, max-age=3600"}
     )
 
 
@@ -447,6 +445,22 @@ def mupi_object_form(
     )
 
 
+async def uploaded_images(request: Request) -> list[UploadFile]:
+    """Imagens enviadas no campo "images", ignorando o campo vazio.
+
+    Sem imagem escolhida, o navegador envia o campo de arquivo vazio, que
+    chega como texto. Declarado como list[UploadFile], o FastAPI recusava o
+    cadastro inteiro com erro 422 e o ponto não era salvo.
+    """
+    form = await request.form()
+
+    return [
+        item
+        for item in form.getlist("images")
+        if isinstance(item, StarletteUploadFile) and item.filename
+    ]
+
+
 @router.post("/mupi-objects")
 def create_mupi_object(
     name: str = Form(..., max_length=150),
@@ -456,7 +470,7 @@ def create_mupi_object(
     active: bool = Form(False),
     badge_ids: list[int] = Form([]),
     video_urls: str = Form(""),
-    images: list[UploadFile] = File([]),
+    images: list[UploadFile] = Depends(uploaded_images),
     db: Session = Depends(get_db),
     theme_id: str = Form(""),
 ):
@@ -496,9 +510,6 @@ def create_mupi_object(
     media_items = []
 
     for image in images:
-        if not image.filename:
-            continue
-
         image_data, mime_type = read_image(image)
 
         media_items.append(
@@ -672,5 +683,5 @@ def get_media_file(
     return Response(
         content=media.data,
         media_type=media.mime_type or "image/png",
-        headers={"Cache-Control": "public, max-age=3600"}
+        headers={"Cache-Control": "private, max-age=3600"}
     )

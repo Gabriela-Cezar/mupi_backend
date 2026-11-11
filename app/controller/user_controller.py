@@ -4,7 +4,7 @@ from sqlalchemy import distinct, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
-from app.controller.mupi_object_controller import haversine_m, serialize_badge
+from app.controller.serializers import serialize_badge_full, serialize_collected
 from app.core.dependencies import get_current_user
 from app.database.database import get_db
 from app.model.badge import Badge, BadgeRule
@@ -17,8 +17,7 @@ from app.service.badge_service import (
     register_visit,
     visit_counts,
 )
-
-PROXIMITY_RADIUS_M = 50
+from app.service.proximity_service import get_mupi_in_range
 
 router = APIRouter(
     prefix="/users",
@@ -34,69 +33,6 @@ class CheckInRequest(BaseModel):
 
 class CollectBadgeRequest(CheckInRequest):
     badge_id: int
-
-
-def serialize_rule(badge: Badge) -> dict:
-    return {
-        "type": badge.rule_type.value,
-        "required_count": badge.required_count,
-        "theme": (
-            {"id": badge.theme.id, "name": badge.theme.name}
-            if badge.theme is not None
-            else None
-        ),
-    }
-
-
-def serialize_badge_full(badge: Badge) -> dict:
-    return {**serialize_badge(badge), "rule": serialize_rule(badge)}
-
-
-def serialize_collected(item: UserBadge) -> dict:
-    return {
-        **serialize_badge_full(item.badge),
-        "collected_at": item.collected_at.isoformat(),
-        "collected_at_object": (
-            {"id": item.mupi_object.id, "name": item.mupi_object.name}
-            if item.mupi_object is not None
-            else None
-        ),
-    }
-
-
-def get_mupi_in_range(
-    db: Session,
-    object_id: int,
-    latitude: float,
-    longitude: float
-) -> MupiObject:
-    mupi = (
-        db.query(MupiObject)
-        .filter(
-            MupiObject.id == object_id,
-            MupiObject.active.is_(True)
-        )
-        .first()
-    )
-
-    if mupi is None:
-        raise HTTPException(
-            status_code=404,
-            detail="MUPI não encontrado."
-        )
-
-    distance = haversine_m(latitude, longitude, mupi.latitude, mupi.longitude)
-
-    if distance > PROXIMITY_RADIUS_M:
-        raise HTTPException(
-            status_code=403,
-            detail=(
-                f"Aproxime-se do MUPI (você está a {round(distance)} m; "
-                f"o limite é {PROXIMITY_RADIUS_M} m)."
-            )
-        )
-
-    return mupi
 
 
 @router.get("/me")

@@ -102,8 +102,8 @@ def test_envio_sem_login_retorna_401_e_nao_grava(client, db_session, rota, dados
     assert nada_foi_criado(db_session)
 
 
-def test_rotas_publicas_do_app_continuam_abertas(client):
-    assert client.get("/mupi-objects").status_code == 200
+def test_arquivos_estaticos_do_painel_continuam_abertos(client):
+    """A tela de login precisa do CSS antes de o admin entrar."""
     assert client.get("/admin-static/style.css").status_code == 200
 
 

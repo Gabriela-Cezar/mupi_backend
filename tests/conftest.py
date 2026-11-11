@@ -15,9 +15,10 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from app.controller import auth_controller  # noqa: E402
 from app.core import admin_auth  # noqa: E402
-from app.core.security import csrf_token_for  # noqa: E402
+from app.core.security import create_access_token, csrf_token_for  # noqa: E402
 from app.database.database import Base, get_db  # noqa: E402
 from app.model.admin import Admin  # noqa: E402
+from app.model.user import User  # noqa: E402
 from app.service import auth_user_email_service as codigos  # noqa: E402
 from app.service.auth_service import gerar_password_hash  # noqa: E402
 from main import app  # noqa: E402
@@ -27,6 +28,8 @@ BASE_URL = "https://testserver"
 
 ADMIN_EMAIL = "admin@mupi.com"
 ADMIN_SENHA = "senha-do-admin"
+
+USUARIO_EMAIL = "usuario@exemplo.com"
 
 
 @pytest.fixture(autouse=True)
@@ -137,3 +140,22 @@ def passar_intervalo_de_reenvio(email: str) -> None:
     """Simula que o intervalo mínimo entre envios já passou para este e-mail."""
     dados = codigos.codigos_verificacao[email.strip().lower()]
     dados["enviado_em"] -= timedelta(seconds=codigos.RESEND_COOLDOWN_SECONDS + 1)
+
+
+@pytest.fixture
+def usuario(db_session):
+    """Usuário do aplicativo (não é administrador)."""
+    usuario = User(email=USUARIO_EMAIL, password_hash="hash-qualquer", email_verified=True)
+    db_session.add(usuario)
+    db_session.commit()
+    return usuario
+
+
+@pytest.fixture
+def user_client(app_de_teste, usuario, emails_enviados):
+    """Cliente do aplicativo com o usuário logado (token no cabeçalho)."""
+    token = create_access_token(usuario.id, usuario.password_hash)
+
+    with TestClient(app_de_teste, base_url=BASE_URL) as test_client:
+        test_client.headers["Authorization"] = f"Bearer {token}"
+        yield test_client

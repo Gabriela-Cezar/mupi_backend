@@ -248,3 +248,89 @@ def test_ponto_recusa_insignia_de_contagem(client, db_session, insignias, tipo):
     assert resposta.status_code == 400
     assert "visitar este ponto" in resposta.json()["detail"]
     assert db_session.query(MupiObject).count() == 0
+
+
+# ---------- Cadastro de ponto: campo de imagem como o navegador envia ----------
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"conteudo-da-imagem"
+CAMPO_DE_ARQUIVO_VAZIO = ("", b"", "application/octet-stream")
+
+
+def ponto_salvo(db_session):
+    db_session.expire_all()
+    return db_session.query(MupiObject).one()
+
+
+def test_ponto_sem_imagem_e_salvo(client, db_session):
+    """Sem imagem escolhida, o navegador envia o campo de arquivo vazio.
+
+    Antes era recusado com 422 e o ponto não era salvo.
+    """
+    resposta = client.post(
+        "/admin/mupi-objects",
+        data=dados_do_ponto(name="Unigoias"),
+        files={"images": CAMPO_DE_ARQUIVO_VAZIO},
+    )
+
+    assert resposta.status_code == 200
+    ponto = ponto_salvo(db_session)
+    assert ponto.name == "Unigoias"
+    assert ponto.media == []
+
+
+def test_ponto_sem_nenhum_campo_de_imagem_e_salvo(client, db_session):
+    resposta = client.post("/admin/mupi-objects", data=dados_do_ponto())
+
+    assert resposta.status_code == 200
+    assert ponto_salvo(db_session).media == []
+
+
+def test_ponto_com_imagem_salva_a_imagem(client, db_session):
+    resposta = client.post(
+        "/admin/mupi-objects",
+        data=dados_do_ponto(),
+        files={"images": ("foto.png", PNG, "image/png")},
+    )
+
+    assert resposta.status_code == 200
+    [midia] = ponto_salvo(db_session).media
+    assert midia.mime_type == "image/png"
+    assert midia.title == "foto.png"
+
+
+def test_imagem_vazia_entre_imagens_validas_e_ignorada(client, db_session):
+    resposta = client.post(
+        "/admin/mupi-objects",
+        data=dados_do_ponto(),
+        files=[
+            ("images", ("foto1.png", PNG, "image/png")),
+            ("images", CAMPO_DE_ARQUIVO_VAZIO),
+            ("images", ("foto2.png", PNG, "image/png")),
+        ],
+    )
+
+    assert resposta.status_code == 200
+    assert [m.title for m in ponto_salvo(db_session).media] == ["foto1.png", "foto2.png"]
+
+
+def test_formulario_completo_como_o_navegador_envia(admin_client, db_session):
+    """Token CSRF no campo escondido (não no cabeçalho), sem imagem e sem tema."""
+    from tests.conftest import csrf_da_sessao
+
+    csrf = admin_client.headers.pop("X-CSRF-Token")
+    assert csrf == csrf_da_sessao(admin_client)
+
+    resposta = admin_client.post(
+        "/admin/mupi-objects",
+        data=dados_do_ponto(
+            name="Unigoias",
+            description="",
+            theme_id="",
+            video_urls="",
+            csrf_token=csrf,
+        ),
+        files={"images": CAMPO_DE_ARQUIVO_VAZIO},
+    )
+
+    assert resposta.status_code == 200
+    assert ponto_salvo(db_session).name == "Unigoias"
