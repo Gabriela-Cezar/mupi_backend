@@ -196,7 +196,8 @@ def search_mupi_objects(
         .options(*mupi_load_options())
         .filter(
             MupiObject.active.is_(True),
-            MupiObject.name.ilike(f"%{name}%"),
+            # autoescape: "%" e "_" digitados valem como texto, não curinga (FAL-17)
+            MupiObject.name.icontains(name, autoescape=True),
         )
         .limit(50)
         .all()
@@ -402,7 +403,7 @@ def admin_search_mupi_objects(
 ):
     objects = (
         db.query(MupiObject)
-        .filter(MupiObject.name.ilike(f"%{name}%"))
+        .filter(MupiObject.name.icontains(name, autoescape=True))  # FAL-17
         .limit(50)
         .all()
     )

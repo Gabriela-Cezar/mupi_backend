@@ -115,6 +115,7 @@ Cada item traz: onde está, o problema, o impacto e o que deve ser feito.
 - **Correção:** será substituída pela nova forma de servir arquivos (ver `03`, PT-06).
 
 ### FAL-17 — Busca por nome não trata caracteres especiais [DESEJÁVEL]
+- **Situação:** ✅ Resolvida (`icontains(..., autoescape=True)` nas buscas do app e do painel)
 - **Onde:** buscas com `ilike(f"%{name}%")`.
 - **Problema:** `%` e `_` digitados pelo usuário funcionam como curingas.
 - **Correção:** escapar esses caracteres.
