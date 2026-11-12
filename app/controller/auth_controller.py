@@ -184,6 +184,7 @@ def register(
     hashed_password = gerar_password_hash(data.password)
 
     codigo = gerar_codigo(
+        db=db,
         email=email,
         hashed_password=hashed_password
     )
@@ -217,6 +218,7 @@ def verify_email(
     email = normalize_email(data.email)
 
     valido, mensagem, hashed_password = verificar_codigo(
+        db=db,
         email=email,
         codigo_digitado=data.codigo
     )
@@ -314,7 +316,7 @@ def recovery_password(
     user = get_user_by_email(db, data.email)
 
     if user is not None:
-        codigo = gerar_codigo_recuperacao(user.email)
+        codigo = gerar_codigo_recuperacao(db, user.email)
 
         background_tasks.add_task(
             send_email,
@@ -336,6 +338,7 @@ def verify_recovery_code(
     email = normalize_email(data.email)
 
     valido, mensagem = verificar_codigo_recuperacao(
+        db=db,
         email=email,
         codigo_digitado=data.codigo
     )
@@ -388,13 +391,14 @@ class ResendVerificationRequest(BaseModel):
 def resend_verification(
     data: ResendVerificationRequest,
     request: Request,
-    background_tasks: BackgroundTasks
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db)
 ):
     _limit_email_requests_by_ip(request)
 
     email = normalize_email(data.email)
 
-    codigo, espera = renovar_codigo(email)
+    codigo, espera = renovar_codigo(db, email)
 
     if espera > 0:
         raise HTTPException(

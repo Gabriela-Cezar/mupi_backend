@@ -119,17 +119,27 @@ def test_primeiras_migracoes(banco):
 
     assert script.get_revision("0001").down_revision is None
     assert script.get_revision("0002").down_revision == "0001"
+    assert script.get_revision("0003").down_revision == "0002"
+    assert script.get_revision("0004").down_revision == "0003"
+
+
+def esquema(url: str) -> list:
+    """O SQL de criação de cada tabela e índice do SQLite."""
+    with create_engine(url).connect() as conn:
+        return conn.exec_driver_sql(
+            "SELECT type, name, sql FROM sqlite_master "
+            "WHERE name != 'alembic_version' ORDER BY name"
+        ).all()
 
 
 def test_0002_nao_faz_nada_fora_do_postgresql(banco):
     cfg = alembic_cfg(banco)
     command.upgrade(cfg, "0001")
-    antes = tabelas(banco)
+    antes = esquema(banco)
 
     command.upgrade(cfg, "0002")
 
-    assert tabelas(banco) == antes
-    assert diferencas(banco) == []
+    assert esquema(banco) == antes
 
 
 # ---------- Nomes das restrições iguais aos do PostgreSQL ----------

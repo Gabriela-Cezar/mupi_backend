@@ -1,6 +1,5 @@
 from app.model.user import User
-from app.service import auth_user_email_service as codigos
-from tests.conftest import passar_intervalo_de_reenvio
+from tests.conftest import codigo_do_ultimo_email, passar_intervalo_de_reenvio
 
 URL = "/auth/resend-verification"
 EMAIL = "ana@exemplo.com"
@@ -31,26 +30,25 @@ def test_logo_apos_o_cadastro_retorna_429(client, emails_enviados):
     assert len(emails_enviados) == 1  # apenas o e-mail do cadastro
 
 
-def test_apos_o_intervalo_envia_novo_codigo(client, emails_enviados):
+def test_apos_o_intervalo_envia_novo_codigo(client, db_session, emails_enviados):
     cadastrar(client)
-    passar_intervalo_de_reenvio(EMAIL)
+    passar_intervalo_de_reenvio(db_session, EMAIL)
 
     resposta = client.post(URL, json={"email": EMAIL})
 
     assert resposta.status_code == 200
     assert resposta.json() == {"message": "Novo código enviado."}
 
-    novo_codigo = codigos.codigos_verificacao[EMAIL]["codigo"]
     email = emails_enviados[-1]
     assert len(emails_enviados) == 2
     assert email["recipient"] == EMAIL
     assert email["subject"] == "Código de verificação - MUPI"
-    assert novo_codigo in email["html_content"]
+    assert codigo_do_ultimo_email(emails_enviados) != ""
 
 
-def test_dois_reenvios_seguidos_o_segundo_retorna_429(client, emails_enviados):
+def test_dois_reenvios_seguidos_o_segundo_retorna_429(client, db_session, emails_enviados):
     cadastrar(client)
-    passar_intervalo_de_reenvio(EMAIL)
+    passar_intervalo_de_reenvio(db_session, EMAIL)
 
     primeira = client.post(URL, json={"email": EMAIL})
     segunda = client.post(URL, json={"email": EMAIL})
@@ -60,9 +58,9 @@ def test_dois_reenvios_seguidos_o_segundo_retorna_429(client, emails_enviados):
     assert len(emails_enviados) == 2
 
 
-def test_email_com_maiusculas_encontra_o_cadastro(client, emails_enviados):
+def test_email_com_maiusculas_encontra_o_cadastro(client, db_session, emails_enviados):
     cadastrar(client, email="Ana@Exemplo.com")
-    passar_intervalo_de_reenvio(EMAIL)
+    passar_intervalo_de_reenvio(db_session, EMAIL)
 
     resposta = client.post(URL, json={"email": "ANA@EXEMPLO.COM"})
 
@@ -83,12 +81,12 @@ def test_sem_corpo_retorna_422(client):
     assert resposta.status_code == 422
 
 
-def test_fluxo_completo_cadastro_reenvio_e_verificacao(client, db_session):
+def test_fluxo_completo_cadastro_reenvio_e_verificacao(client, db_session, emails_enviados):
     cadastrar(client)
-    codigo_antigo = codigos.codigos_verificacao[EMAIL]["codigo"]
-    passar_intervalo_de_reenvio(EMAIL)
+    codigo_antigo = codigo_do_ultimo_email(emails_enviados)
+    passar_intervalo_de_reenvio(db_session, EMAIL)
     client.post(URL, json={"email": EMAIL})
-    codigo_novo = codigos.codigos_verificacao[EMAIL]["codigo"]
+    codigo_novo = codigo_do_ultimo_email(emails_enviados)
 
     if codigo_antigo != codigo_novo:  # chance de 1 em 1 milhão de serem iguais
         com_antigo = client.post(
@@ -104,9 +102,9 @@ def test_fluxo_completo_cadastro_reenvio_e_verificacao(client, db_session):
     assert db_session.query(User).filter_by(email=EMAIL).count() == 1
 
 
-def test_apos_conta_criada_nao_ha_mais_reenvio(client):
+def test_apos_conta_criada_nao_ha_mais_reenvio(client, emails_enviados):
     cadastrar(client)
-    codigo = codigos.codigos_verificacao[EMAIL]["codigo"]
+    codigo = codigo_do_ultimo_email(emails_enviados)
     client.post("/auth/verify-email", json={"email": EMAIL, "codigo": codigo})
 
     resposta = client.post(URL, json={"email": EMAIL})

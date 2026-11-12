@@ -15,7 +15,7 @@ class UserBadge(Base):
 
     badge_id = Column(
         Integer,
-        ForeignKey("badges.id", ondelete="CASCADE"),
+        ForeignKey("badges.id", ondelete="RESTRICT"),  # FAL-11: preserva o histórico
         primary_key=True
     )
 

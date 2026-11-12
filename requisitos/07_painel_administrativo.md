@@ -70,7 +70,7 @@ Para cada item: **listar, criar, editar, desativar/reativar e excluir**. Toda li
   - **tema** usado por insígnia → exclusão bloqueada; usado por pontos/rotas → remove só as ligações, após confirmação.
 - Itens sem histórico podem ser excluídos de verdade (inclusive os arquivos de foto/áudio).
 - Sempre pedir confirmação antes de excluir.
-- No banco, trocar os `ON DELETE CASCADE` de `user_visits` e `user_badges` para `RESTRICT` (proteção extra).
+- No banco, trocar os `ON DELETE CASCADE` de `user_visits` e `user_badges` para `RESTRICT` (proteção extra). ✅ Feito na FAL-11 (migração 0003). Ao implementar a exclusão, verificar o histórico antes de excluir e tratar `IntegrityError` como "exclusão bloqueada".
 
 ## Estatísticas
 

@@ -14,7 +14,7 @@ class UserVisit(Base):
 
     object_id = Column(
         Integer,
-        ForeignKey("mupi_objects.id", ondelete="CASCADE"),
+        ForeignKey("mupi_objects.id", ondelete="RESTRICT"),  # FAL-11: preserva o histórico
         primary_key=True
     )
 

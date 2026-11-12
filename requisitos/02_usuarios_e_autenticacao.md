@@ -67,6 +67,7 @@ O login é **obrigatório** para usar o app: todas as rotas usadas pelo app, exc
 - **Observação:** a Google Play e a App Store exigem que o app ofereça exclusão de conta quando há cadastro.
 
 ### USR-09 — Códigos guardados no banco [MVP]
+- **Situação:** ✅ Feito na FAL-13 (migração 0004).
 - Nova tabela `email_codes`: e-mail, finalidade (`verificacao` ou `recuperacao`), hash do código, hash da senha pendente (só no cadastro), expira em, tentativas, enviado em.
 - O código não é guardado em texto puro (guardar hash).
 - Mantém as regras atuais: 6 dígitos, 10 min, 5 tentativas, uso único, 60 s entre envios.

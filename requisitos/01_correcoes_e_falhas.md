@@ -77,7 +77,7 @@ Cada item traz: onde está, o problema, o impacto e o que deve ser feito.
 ## Falhas de integridade de dados
 
 ### FAL-11 — Exclusões apagam o histórico dos usuários [MVP]
-- **Situação:** ⏳ Pendente (o commit 14ba7c6, chamado "FAL-11", contém na verdade a FAL-14)
+- **Situação:** ✅ Resolvida no banco (migração 0003: `ON DELETE RESTRICT` em `user_visits.object_id` e `user_badges.badge_id`; o banco recusa excluir ponto visitado ou insígnia conquistada). As telas de exclusão do painel, com mensagem e opção de desativar, ficam para a ADM-09. Obs.: o commit 14ba7c6, chamado "FAL-11", contém na verdade a FAL-14.
 - **Onde:** `app/model/user_visit.py` e `user_badge.py` (`ondelete="CASCADE"` para pontos e insígnias).
 - **Problema:** excluir um ponto apaga as visitas de todos os usuários a ele; excluir uma insígnia apaga a conquista de todos que a tinham.
 - **Impacto:** contraria a regra "a insígnia continua com o usuário".
@@ -90,6 +90,7 @@ Cada item traz: onde está, o problema, o impacto e o que deve ser feito.
 - **Correção:** contar todas as visitas registradas, independentemente de o ponto estar ativo (ver `06_insignias.md`, INS-05).
 
 ### FAL-13 — Códigos de verificação guardados na memória [MVP]
+- **Situação:** ✅ Resolvida (tabela `email_codes`, migração 0004; só o hash HMAC do código é guardado; códigos vencidos há mais de 1 dia são apagados ao gerar um novo)
 - **Onde:** `app/service/auth_user_email_service.py` (dicionários em memória).
 - **Impacto:** reiniciar o servidor apaga os códigos pendentes; com mais de um processo, o código gerado em um processo não é reconhecido no outro.
 - **Correção:** guardar os códigos no banco (ver `02_usuarios_e_autenticacao.md`, USR-09).

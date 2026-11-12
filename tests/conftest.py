@@ -8,6 +8,7 @@ os.environ["SECRET_KEY"] = "chave-secreta-apenas-para-testes"
 os.environ["CORS_ALLOWED_ORIGINS"] = ""
 os.environ.pop("CORS_ALLOWED_ORIGIN_REGEX", None)
 
+import re  # noqa: E402
 from datetime import timedelta  # noqa: E402
 
 import pytest  # noqa: E402
@@ -32,6 +33,7 @@ from app.core import admin_auth  # noqa: E402
 from app.core.security import create_access_token, csrf_token_for  # noqa: E402
 from app.database.database import Base, get_db  # noqa: E402
 from app.model.admin import Admin  # noqa: E402
+from app.model.email_code import EmailCode  # noqa: E402
 from app.model.user import User  # noqa: E402
 from app.service import auth_user_email_service as codigos  # noqa: E402
 from app.service.auth_service import gerar_password_hash  # noqa: E402
@@ -48,11 +50,9 @@ USUARIO_EMAIL = "usuario@exemplo.com"
 
 @pytest.fixture(autouse=True)
 def limpar_estado_em_memoria():
-    """Cada teste começa sem códigos pendentes, tentativas de login (app e
-    painel) nem contagem de envios de e-mail."""
+    """Cada teste começa sem tentativas de login (app e painel) nem contagem
+    de envios de e-mail. (Os códigos ficam no banco, que é novo a cada teste.)"""
     def limpar():
-        codigos.codigos_verificacao.clear()
-        codigos.codigos_recuperacao.clear()
         admin_auth._failed_logins.clear()
         for limiter in LIMITADORES_DE_EMAIL + LIMITADORES_DE_LOGIN:
             limiter.reset()
@@ -154,10 +154,23 @@ def admin_client(app_de_teste, admin, emails_enviados):
         yield test_client
 
 
-def passar_intervalo_de_reenvio(email: str) -> None:
+def codigo_pendente(db, email: str, finalidade: str = "verificacao"):
+    """O registro do código pendente deste e-mail (ou None)."""
+    return db.query(EmailCode).filter_by(
+        email=email.strip().lower(), purpose=finalidade
+    ).one_or_none()
+
+
+def passar_intervalo_de_reenvio(db, email: str) -> None:
     """Simula que o intervalo mínimo entre envios já passou para este e-mail."""
-    dados = codigos.codigos_verificacao[email.strip().lower()]
-    dados["enviado_em"] -= timedelta(seconds=codigos.RESEND_COOLDOWN_SECONDS + 1)
+    registro = codigo_pendente(db, email)
+    registro.sent_at -= timedelta(seconds=codigos.RESEND_COOLDOWN_SECONDS + 1)
+    db.commit()
+
+
+def codigo_do_ultimo_email(enviados: list) -> str:
+    """O código de 6 dígitos do último e-mail enviado (o banco só tem o hash)."""
+    return re.search(r"<h1>(\d{6})</h1>", enviados[-1]["html_content"]).group(1)
 
 
 @pytest.fixture
