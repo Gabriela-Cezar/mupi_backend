@@ -17,6 +17,7 @@ Jinja2==3.1.4                # templates HTML do painel
 # Banco de dados (PostgreSQL)
 SQLAlchemy==2.0.52
 psycopg2-binary==2.9.13      # driver do PostgreSQL usado pelo SQLAlchemy
+alembic==1.20.1              # migrações do banco: alembic upgrade head
 
 # Configuração
 python-dotenv==0.21.0        # lê o arquivo .env

@@ -5,6 +5,8 @@ Uso (na raiz do projeto):
 """
 from getpass import getpass
 
+from sqlalchemy import inspect
+
 from app.database.database import SessionLocal, engine
 from app.model.admin import Admin
 from app.service.admin_service import (
@@ -33,10 +35,22 @@ def ask_password() -> str:
         return password
 
 
+MIGRATIONS_MISSING = (
+    "A tabela de administradores não existe neste banco. "
+    "Aplique as migrações primeiro (na raiz do projeto):\n"
+    "    alembic upgrade head"
+)
+
+
+def admins_table_exists(bind=engine) -> bool:
+    return inspect(bind).has_table(Admin.__tablename__)
+
+
 def main() -> None:
-    # Enquanto não há migrações (INF-01), cria só a tabela de admins, se faltar.
-    # Não apaga nem altera nenhuma outra tabela.
-    Admin.__table__.create(bind=engine, checkfirst=True)
+    # As tabelas são criadas só pelas migrações (FAL-14)
+    if not admins_table_exists():
+        print(f"Erro: {MIGRATIONS_MISSING}")
+        raise SystemExit(1)
 
     email = input("E-mail do administrador: ").strip()
 

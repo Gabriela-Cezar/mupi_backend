@@ -93,6 +93,7 @@ Cada item traz: onde está, o problema, o impacto e o que deve ser feito.
 - **Correção:** guardar os códigos no banco (ver `02_usuarios_e_autenticacao.md`, USR-09).
 
 ### FAL-14 — Recriação de tabelas apaga dados [MVP]
+- **Situação:** ✅ Resolvida (Alembic adotado; migrações 0001 e 0002 aplicadas no banco de desenvolvimento em 11/11/2026, com backup antes; scripts que apagavam tabelas removidos)
 - **Onde:** `create_tables.py` e `reset_mupi_tables.py` (fazem `drop_all`).
 - **Impacto:** qualquer mudança no modelo exige apagar dados.
 - **Correção:** adotar Alembic (ver `08_infraestrutura.md`, INF-01). Manter os scripts apenas para desenvolvimento, com aviso claro, ou removê-los.
