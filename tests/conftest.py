@@ -28,6 +28,7 @@ LIMITADORES_DE_EMAIL = (
 LIMITADORES_DE_LOGIN = (
     auth_controller.login_ip_email_limiter,
     auth_controller.login_ip_limiter,
+    auth_controller.refresh_limiter,
 )
 from app.core import admin_auth  # noqa: E402
 from app.core.security import create_access_token, csrf_token_for  # noqa: E402
@@ -185,7 +186,7 @@ def usuario(db_session):
 @pytest.fixture
 def user_client(app_de_teste, usuario, emails_enviados):
     """Cliente do aplicativo com o usuário logado (token no cabeçalho)."""
-    token = create_access_token(usuario.id, usuario.password_hash)
+    token = create_access_token(usuario.id, usuario.token_version)
 
     with TestClient(app_de_teste, base_url=BASE_URL) as test_client:
         test_client.headers["Authorization"] = f"Bearer {token}"

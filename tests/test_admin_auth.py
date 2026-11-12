@@ -295,7 +295,7 @@ def test_sessao_expirada_e_recusada(client, admin):
 
 
 def test_token_do_aplicativo_nao_serve_como_sessao_do_painel(client, admin):
-    usar_sessao(client, create_access_token(admin.id, admin.password_hash))
+    usar_sessao(client, create_access_token(admin.id, 0))
 
     assert client.get("/admin/themes").status_code == 401
 

@@ -2,7 +2,7 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
-from app.core.security import decode_access_token, fingerprint_matches
+from app.core.security import decode_access_token, token_version_matches
 from app.database.database import get_db
 from app.model.user import User
 
@@ -37,7 +37,7 @@ def get_current_user(
     if (
         user is None
         or not user.is_active
-        or not fingerprint_matches(payload, user.password_hash)
+        or not token_version_matches(payload, user.token_version)
     ):
         raise unauthorized
 

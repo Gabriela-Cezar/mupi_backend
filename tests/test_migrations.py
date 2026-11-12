@@ -121,6 +121,7 @@ def test_primeiras_migracoes(banco):
     assert script.get_revision("0002").down_revision == "0001"
     assert script.get_revision("0003").down_revision == "0002"
     assert script.get_revision("0004").down_revision == "0003"
+    assert script.get_revision("0005").down_revision == "0004"
 
 
 def esquema(url: str) -> list:

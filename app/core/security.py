@@ -8,7 +8,9 @@ from app.core.config import SECRET_KEY
 
 ALGORITHM = "HS256"
 RESET_TOKEN_MINUTES = 10
-ACCESS_TOKEN_DAYS = 7
+# Sessão "deslizante" (USR-11): o token vale 30 dias e o app troca por um
+# novo (POST /auth/refresh) sempre que é aberto
+ACCESS_TOKEN_DAYS = 30
 ADMIN_SESSION_HOURS = 12
 
 
@@ -17,20 +19,34 @@ def _fingerprint(password_hash: str) -> str:
 
 
 def fingerprint_matches(payload: dict, current_password_hash: str) -> bool:
+    """Usado só pela sessão do painel (administradores sempre têm senha)."""
     return hmac.compare_digest(
         str(payload.get("fp", "")),
         _fingerprint(current_password_hash)
     )
 
 
-reset_token_matches = fingerprint_matches
+# ---------- Tokens do app (usuários) ----------
+#
+# Levam a versão de sessão do usuário (users.token_version, USR-05). Quando
+# ela muda, todos os tokens emitidos antes deixam de valer, com ou sem senha
+# (contas só Google não têm senha).
+
+def token_version_matches(payload: dict, current_version: int) -> bool:
+    version = payload.get("ver")
+
+    # bool é um tipo de int no Python: True não pode passar por 1
+    if type(version) is not int:
+        return False
+
+    return version == current_version
 
 
-def create_reset_token(email: str, current_password_hash: str) -> str:
+def create_reset_token(email: str, token_version: int) -> str:
     payload = {
         "sub": email,
         "purpose": "password_reset",
-        "fp": _fingerprint(current_password_hash),
+        "ver": token_version,
         "exp": datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -48,11 +64,11 @@ def decode_reset_token(token: str) -> dict | None:
     return payload
 
 
-def create_access_token(user_id: int, current_password_hash: str) -> str:
+def create_access_token(user_id: int, token_version: int) -> str:
     payload = {
         "sub": str(user_id),
         "purpose": "access",
-        "fp": _fingerprint(current_password_hash),
+        "ver": token_version,
         "exp": datetime.now(timezone.utc) + timedelta(days=ACCESS_TOKEN_DAYS),
     }
     return jwt.encode(payload, SECRET_KEY, algorithm=ALGORITHM)
@@ -68,6 +84,7 @@ def decode_access_token(token: str) -> dict | None:
         return None
 
     return payload
+
 
 # ---------- Sessão do painel administrativo ----------
 

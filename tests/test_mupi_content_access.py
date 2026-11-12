@@ -432,7 +432,7 @@ def test_perfil_continua_funcionando(user_client, ponto):
 
 
 def test_token_criado_para_outro_id_e_recusado(client, ponto):
-    token = create_access_token(999, "hash-qualquer")
+    token = create_access_token(999, 0)
 
     resposta = client.get("/mupi-objects", headers={"Authorization": f"Bearer {token}"})
 

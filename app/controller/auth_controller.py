@@ -2,20 +2,23 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
+from app.core.dependencies import get_current_user
 from app.core.rate_limit import RateLimiter, format_wait, too_many_requests
 from app.core.security import (
     create_access_token,
     create_reset_token,
     decode_reset_token,
-    reset_token_matches,
+    token_version_matches,
 )
 from app.database.database import get_db
+from app.model.user import User
 from app.service.auth_service import (
     authenticate_user,
     create_user,
     gerar_password_hash,
     get_user_by_email,
     normalize_email,
+    revoke_sessions,
 )
 from app.service.auth_user_email_service import (
     RESEND_COOLDOWN_SECONDS,
@@ -288,13 +291,47 @@ def login(
     # Login certo zera as falhas deste e-mail nesta rede
     login_ip_email_limiter.forget(ip_and_email)
 
+    return _session_response(user, "Login realizado com sucesso")
+
+
+def _session_response(user: User, message: str) -> dict:
+    """Resposta com o token de sessão: a mesma no login e na renovação."""
     return {
-        "message": "Login realizado com sucesso",
-        "access_token": create_access_token(user.id, user.password_hash),
+        "message": message,
+        "access_token": create_access_token(user.id, user.token_version),
         "token_type": "bearer",
         "user_id": user.id,
         "email": user.email
     }
+
+
+# ---------- Renovação da sessão (USR-11) ----------
+
+# O app renova ao abrir; 30 por hora sobra para o uso normal e impede que a
+# rota seja chamada sem parar
+REFRESH_PER_USER = 30
+REFRESH_WINDOW_SECONDS = 60 * 60
+refresh_limiter = RateLimiter(REFRESH_PER_USER, REFRESH_WINDOW_SECONDS)
+
+
+@router.post("/refresh")
+def refresh_session(user: User = Depends(get_current_user)):
+    """Troca o token atual (ainda válido) por um novo de 30 dias.
+
+    get_current_user já recusa (401) token expirado, adulterado, de outro
+    tipo, de usuário desativado ou de versão antiga (USR-05).
+    O token antigo continua valendo até expirar.
+    """
+    wait = refresh_limiter.hit(user.id)
+
+    if wait:
+        raise too_many_requests(
+            wait,
+            "Muitas renovações de sessão. "
+            f"Aguarde {format_wait(wait)} e tente novamente."
+        )
+
+    return _session_response(user, "Sessão renovada")
 
 
 @router.post("/recovery-password")
@@ -353,7 +390,7 @@ def verify_recovery_code(
 
     return {
         "message": mensagem,
-        "reset_token": create_reset_token(user.email, user.password_hash)
+        "reset_token": create_reset_token(user.email, user.token_version)
     }
 
 
@@ -374,10 +411,13 @@ def reset_password(
 
     user = get_user_by_email(db, payload["sub"])
 
-    if user is None or not reset_token_matches(payload, user.password_hash):
+    if user is None or not token_version_matches(payload, user.token_version):
         raise invalid
 
     user.password_hash = gerar_password_hash(data.password)
+    # Encerra as sessões abertas (inclusive a de quem pegou a senha antiga)
+    # e torna este reset_token de uso único
+    revoke_sessions(user)
     db.commit()
 
     return {"message": "Senha alterada com sucesso."}

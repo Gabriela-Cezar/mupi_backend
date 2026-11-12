@@ -10,7 +10,7 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine, event, select
+from sqlalchemy import create_engine, event, select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -205,11 +205,11 @@ def test_desfazer_a_0003_volta_a_apagar_em_cascata(tmp_path):
 
     engine = ligar_chaves_estrangeiras(create_engine(url))
     with Session(engine) as db:
-        usuario = User(email="v@exemplo.com", password_hash="x")
+        # SQL direto: o model User atual tem colunas que a 0002 ainda não tinha
+        db.execute(text("INSERT INTO users (email, password_hash) VALUES ('v@exemplo.com', 'x')"))
+        usuario_id = db.execute(text("SELECT id FROM users")).scalar_one()
         ponto = criar_ponto(db)
-        db.add(usuario)
-        db.commit()
-        db.add(UserVisit(user_id=usuario.id, object_id=ponto.id))
+        db.add(UserVisit(user_id=usuario_id, object_id=ponto.id))
         db.commit()
 
         excluir(db, ponto)

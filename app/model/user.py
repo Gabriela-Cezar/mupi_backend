@@ -27,6 +27,15 @@ class User(Base):
         nullable=False
     )
 
+    # Muda (+1) para cancelar todas as sessões e links de recuperação já
+    # emitidos: ao redefinir a senha, ao excluir a conta... (USR-05)
+    token_version = Column(
+        Integer,
+        default=0,
+        server_default="0",
+        nullable=False
+    )
+
     is_active = Column(
         Boolean,
         default=True,

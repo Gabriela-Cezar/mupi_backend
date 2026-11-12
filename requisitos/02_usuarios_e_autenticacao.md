@@ -42,6 +42,7 @@ O login é **obrigatório** para usar o app: todas as rotas usadas pelo app, exc
 - **Pré-requisito externo:** criar o projeto no Google Cloud Console e as credenciais OAuth para Android (com o SHA-1 do app) e iOS.
 
 ### USR-05 — Invalidação de sessão sem depender da senha [MVP]
+- **Situação:** ✅ Feita (migração 0005; `revoke_sessions` chamado ao redefinir a senha. Falta chamar também na troca de senha e na exclusão de conta, quando essas rotas existirem — USR-08)
 - Hoje o token carrega uma "impressão digital" do hash da senha. Contas só Google não têm senha.
 - Substituir por um campo `users.token_version` (inteiro). O token carrega a versão; o servidor rejeita tokens com versão diferente.
 - Incrementar `token_version` ao trocar a senha, ao redefinir a senha e ao excluir a conta.
@@ -79,6 +80,7 @@ O login é **obrigatório** para usar o app: todas as rotas usadas pelo app, exc
 - Arquivos (foto/áudio) são servidos por link assinado do S3, que só é entregue a usuários logados (ver `08_infraestrutura.md`, INF-04).
 
 ### USR-11 — Sessão renovada a cada uso [MVP — decidido em 11/11/2026]
+- **Situação:** ✅ Backend feito (`POST /auth/refresh`, tokens de 30 dias, limite de 30 renovações por hora por usuário). Falta o app chamar a rota ao abrir (APP-AUT-05).
 - **Problema:** hoje o token dura 7 dias fixos. Num app de celular usado de vez em quando (passeios), quase toda visita começaria com um novo login.
 - **Decisão:** sessão "deslizante". O token passa a valer **30 dias** e é trocado por um novo a cada vez que o app é aberto. Quem usa o app ao menos uma vez a cada 30 dias nunca precisa entrar de novo; quem fica mais tempo sem abrir faz login.
 - **Alternativas descartadas:** só aumentar o prazo (token copiado valeria meses) e o par token de acesso + token de renovação guardado no servidor (mais seguro, porém mais trabalhoso e desnecessário para o risco do MUPI, que não guarda pagamentos nem dados sensíveis).

@@ -72,3 +72,12 @@ def authenticate_user(
         return None
 
     return user
+
+def revoke_sessions(user: User) -> None:
+    """Cancela todos os tokens já emitidos para o usuário (USR-05).
+
+    Vale para as sessões do app e para os links de recuperação de senha.
+    Chamar ao redefinir ou trocar a senha e ao excluir a conta.
+    Não faz commit: quem chama decide quando confirmar.
+    """
+    user.token_version = (user.token_version or 0) + 1
