@@ -8,15 +8,17 @@ from app.model.user_visit import UserVisit
 
 
 def visit_counts(db: Session, user_id: int) -> tuple[int, dict[int, int]]:
-    """Devolve (total de MUPIs visitados, visitados por tema)."""
+    """Devolve (total de MUPIs visitados, visitados por tema).
+
+    Conta todas as visitas registradas, inclusive a pontos hoje desativados:
+    a visita aconteceu, e desativar um ponto não pode fazer o progresso das
+    insígnias do usuário diminuir (FAL-12 / INS-05).
+    """
     rows = (
         db.query(MupiObject.theme_id, func.count(UserVisit.object_id))
         .select_from(UserVisit)
         .join(MupiObject, MupiObject.id == UserVisit.object_id)
-        .filter(
-            UserVisit.user_id == user_id,
-            MupiObject.active.is_(True)
-        )
+        .filter(UserVisit.user_id == user_id)
         .group_by(MupiObject.theme_id)
         .all()
     )

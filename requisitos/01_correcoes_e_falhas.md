@@ -77,12 +77,14 @@ Cada item traz: onde está, o problema, o impacto e o que deve ser feito.
 ## Falhas de integridade de dados
 
 ### FAL-11 — Exclusões apagam o histórico dos usuários [MVP]
+- **Situação:** ⏳ Pendente (o commit 14ba7c6, chamado "FAL-11", contém na verdade a FAL-14)
 - **Onde:** `app/model/user_visit.py` e `user_badge.py` (`ondelete="CASCADE"` para pontos e insígnias).
 - **Problema:** excluir um ponto apaga as visitas de todos os usuários a ele; excluir uma insígnia apaga a conquista de todos que a tinham.
 - **Impacto:** contraria a regra "a insígnia continua com o usuário".
 - **Correção:** ver `07_painel_administrativo.md`, ADM-09 (exclusão bloqueada quando há histórico; usar desativação).
 
 ### FAL-12 — Desativar um ponto reduz o progresso dos usuários [MVP]
+- **Situação:** ✅ Resolvida
 - **Onde:** `app/service/badge_service.py`, `visit_counts` (filtra `MupiObject.active`).
 - **Impacto:** se um ponto for desativado, quem o visitou "perde" a visita na contagem e o progresso das insígnias diminui.
 - **Correção:** contar todas as visitas registradas, independentemente de o ponto estar ativo (ver `06_insignias.md`, INS-05).
