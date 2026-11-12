@@ -70,6 +70,8 @@ O usuário anda pela cidade guiado pelo aplicativo e visita pontos turísticos e
 
 ## 5. Ordem sugerida de execução (≈ 8 semanas até janeiro)
 
+> **Substituída em 12/11/2026 por `09_ordem_de_execucao.md`** (ordem conjunta do backend e do app). O texto abaixo fica só como histórico.
+
 1. **Semana 1** — Correções críticas (arquivo 01), migrações com Alembic, `requirements.txt`, conta AWS configurada (alertas de custo, bucket S3, banco) e camada de armazenamento (arquivo 08).
 2. **Semana 2** — Login do painel admin + novo modelo de ponto (temas múltiplos, blocos de texto, foto única, áudio, vídeos, campos de estabelecimento).
 3. **Semana 3** — Mapa, abertura do ponto com proximidade, registro de visita, novo fluxo de insígnias de ponto e de contagem.
