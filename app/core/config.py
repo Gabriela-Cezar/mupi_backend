@@ -1,3 +1,7 @@
+"""Configurações do backend, lidas das variáveis de ambiente (arquivo .env).
+
+Todo o código lê as configurações daqui, nunca direto com os.getenv (FAL-18).
+"""
 import os
 
 from dotenv import load_dotenv
@@ -10,6 +14,11 @@ def _require(name: str) -> str:
     if not value:
         raise RuntimeError(f"Variável de ambiente obrigatória ausente: {name}")
     return value
+
+
+def _optional(name: str) -> str | None:
+    value = (os.getenv(name) or "").strip()
+    return value or None
 
 
 DATABASE_URL = _require("DATABASE_URL")
@@ -27,3 +36,8 @@ ADMIN_COOKIE_SECURE = os.getenv("ADMIN_COOKIE_SECURE", "true").lower() != "false
 # desenvolvimento ou um futuro painel em outro domínio. Ver app/core/cors.py.
 CORS_ALLOWED_ORIGINS = os.getenv("CORS_ALLOWED_ORIGINS", "")
 CORS_ALLOWED_ORIGIN_REGEX = os.getenv("CORS_ALLOWED_ORIGIN_REGEX") or None
+
+# Chave do OpenRouteService, usada para traçar a rota a pé até o ponto
+# (botão "Como chegar"). Opcional: sem ela o servidor sobe normalmente,
+# e só essa rota responde com erro explicando que falta a chave.
+OPENROUTESERVICE_API_KEY = _optional("OPENROUTESERVICE_API_KEY")

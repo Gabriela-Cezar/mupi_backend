@@ -1,5 +1,4 @@
 import logging
-import os
 from urllib.parse import urlparse
 
 import polyline
@@ -27,6 +26,7 @@ from app.controller.serializers import (
     serialize_summary,
 )
 from app.core.admin_auth import require_admin_with_csrf
+from app.core.config import OPENROUTESERVICE_API_KEY
 from app.core.dependencies import get_current_user
 from app.core.templates import templates
 from app.database.database import get_db
@@ -268,7 +268,7 @@ def get_mupi_route(
 ):
     mupi = get_active_mupi(db, object_id)
 
-    api_key = os.getenv("OPENROUTESERVICE_API_KEY")
+    api_key = OPENROUTESERVICE_API_KEY
 
     if not api_key:
         raise HTTPException(

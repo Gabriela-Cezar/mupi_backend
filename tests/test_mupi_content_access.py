@@ -384,7 +384,7 @@ class RespostaFalsa:
 
 
 def test_rota_a_pe_funciona_com_login(user_client, ponto, monkeypatch):
-    monkeypatch.setenv("OPENROUTESERVICE_API_KEY", "chave-falsa")
+    monkeypatch.setattr(mupi_object_controller, "OPENROUTESERVICE_API_KEY", "chave-falsa")
     monkeypatch.setattr(mupi_object_controller.requests, "post", lambda *a, **k: RespostaFalsa())
 
     resposta = user_client.get(f"/mupi-objects/{ponto.id}/route", params=LONGE)
@@ -395,7 +395,7 @@ def test_rota_a_pe_funciona_com_login(user_client, ponto, monkeypatch):
 
 
 def test_rota_a_pe_para_ponto_inativo_retorna_404(user_client, ponto_inativo, monkeypatch):
-    monkeypatch.setenv("OPENROUTESERVICE_API_KEY", "chave-falsa")
+    monkeypatch.setattr(mupi_object_controller, "OPENROUTESERVICE_API_KEY", "chave-falsa")
 
     resposta = user_client.get(f"/mupi-objects/{ponto_inativo.id}/route", params=LONGE)
 

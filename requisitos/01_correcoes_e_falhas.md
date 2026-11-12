@@ -121,7 +121,7 @@ Cada item traz: onde está, o problema, o impacto e o que deve ser feito.
 - **Correção:** escapar esses caracteres.
 
 ### FAL-18 — Configuração lida de formas diferentes [MVP]
-- **Situação:** 🟡 Parcial (CORS e cookie do painel já estão no config.py; falta a OPENROUTESERVICE_API_KEY)
+- **Situação:** ✅ Resolvida (todas as variáveis de ambiente são lidas em `app/core/config.py`; um teste impede `os.getenv` em outros arquivos)
 - **Onde:** `OPENROUTESERVICE_API_KEY` é lida com `os.getenv` dentro da rota; as demais chaves passam por `app/core/config.py`.
 - **Correção:** centralizar em `config.py`, junto com as novas configurações (distância de proximidade, origens CORS, armazenamento, Google).
 
