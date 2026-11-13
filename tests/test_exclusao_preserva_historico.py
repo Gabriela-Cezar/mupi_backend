@@ -120,14 +120,14 @@ def test_ponto_visitado_pode_ser_desativado(db, usuario):
 def test_excluir_ponto_sem_visitas_funciona(db):
     ponto = criar_ponto(db)
     insignia = criar_insignia(db)
-    db.add(MupiObjectMedia(object_id=ponto.id, type=MediaType.IMAGE, data=b"x", mime_type="image/png"))
+    db.add(MupiObjectMedia(object_id=ponto.id, type=MediaType.VIDEO, url="https://youtu.be/x"))
     db.add(MupiObjectBadge(object_id=ponto.id, badge_id=insignia.id))
     db.commit()
 
     excluir(db, ponto)
 
     assert db.get(MupiObject, ponto.id) is None
-    assert contar(db, MupiObjectMedia) == 0      # fotos e vídeos do ponto vão junto
+    assert contar(db, MupiObjectMedia) == 0      # os vídeos do ponto vão junto
     assert contar(db, MupiObjectBadge) == 0      # só a ligação; a insígnia fica
     assert db.get(Badge, insignia.id) is not None
 
@@ -208,11 +208,16 @@ def test_desfazer_a_0003_volta_a_apagar_em_cascata(tmp_path):
         # SQL direto: o model User atual tem colunas que a 0002 ainda não tinha
         db.execute(text("INSERT INTO users (email, password_hash) VALUES ('v@exemplo.com', 'x')"))
         usuario_id = db.execute(text("SELECT id FROM users")).scalar_one()
-        ponto = criar_ponto(db)
-        db.add(UserVisit(user_id=usuario_id, object_id=ponto.id))
+        # O ponto também por SQL: o model atual tem photo_key (migração 0006)
+        db.execute(text(
+            "INSERT INTO mupi_objects (name, latitude, longitude) VALUES ('Ponto', -16.68, -49.25)"
+        ))
+        ponto_id = db.execute(text("SELECT id FROM mupi_objects")).scalar_one()
+        db.add(UserVisit(user_id=usuario_id, object_id=ponto_id))
         db.commit()
 
-        excluir(db, ponto)
+        db.execute(text("DELETE FROM mupi_objects WHERE id = :id"), {"id": ponto_id})
+        db.commit()
 
         assert contar(db, UserVisit) == 0
     engine.dispose()

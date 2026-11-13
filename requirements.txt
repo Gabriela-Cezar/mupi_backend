@@ -31,3 +31,4 @@ argon2-cffi==25.1.0          # algoritmo Argon2 usado pelo pwdlib
 resend==2.44.0               # envio de e-mails
 requests==2.34.2             # chamadas ao OpenRouteService (rota a pé)
 polyline==2.0.4              # decodifica o trajeto devolvido pelo OpenRouteService
+boto3==1.44.1                # arquivos no Amazon S3 (fotos, áudios, imagens de insígnia)

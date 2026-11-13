@@ -43,6 +43,7 @@ Um ponto MUPI é um local físico específico (uma fachada, uma escultura, um es
 - **Leitura em voz alta (acessibilidade):** feita no próprio celular com o recurso de texto para fala do Flutter (ex.: pacote `flutter_tts`, voz em português). O backend não gera áudio; apenas entrega o texto limpo, sem marcações. O app deve permitir ouvir cada bloco (lendo título + texto) e, de preferência, todos em sequência.
 
 ### PT-05 — Foto [MVP]
+- **Situação:** 🟡 Parcial (Etapa 1): uma foto por ponto em `mupi_objects.photo_key`, no S3, enviada pelo painel. Falta substituir/remover a foto na edição do ponto (ADM-04, Etapa 2).
 - Uma foto por ponto, sem legenda e sem autor.
 - Formatos: PNG, JPEG ou WebP, até 5 MB (validação pelo conteúdo do arquivo já existe).
 - **Sugestão:** obrigatória para ativar o ponto, porque aparece no mapa. Se o administrador não enviar, o app mostra uma imagem padrão.
@@ -100,6 +101,7 @@ Todas as rotas exigem login (USR-10) e só consideram pontos ativos.
 - Conteúdo devolvido: dados do resumo + blocos de texto ordenados + endereço do áudio (e duração) + vídeos + endereço, horário, acessibilidade + insígnias ganhas naquela abertura.
 
 ### PT-14 — Arquivos de mídia [MVP]
+- **Situação:** 🟡 Parcial (Etapa 1): foto do ponto e imagem da insígnia por link assinado de 24 h; rotas `/mupi-objects/{id}/image`, `/mupi-objects/media/{id}` e `/mupi-objects/badges/{id}/image` removidas. O áudio entra na Etapa 3 (PT-06).
 - A foto pode ser acessada a qualquer momento por usuário logado (é exibida no mapa).
 - O áudio só é obtido depois que o ponto foi aberto: a abertura (VIS-01) devolve um link temporário assinado do S3, válido por ~1 h (ver INF-04).
 - Foto, capa de rota e imagem de insígnia também são entregues por link assinado do S3, com validade longa.

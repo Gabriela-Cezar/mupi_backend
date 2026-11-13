@@ -6,3 +6,4 @@
 
 pytest==9.2.0
 httpx==0.28.1                # usado pelo TestClient do FastAPI nos testes
+moto==5.2.5                  # S3 simulado nos testes (nada chega à AWS)

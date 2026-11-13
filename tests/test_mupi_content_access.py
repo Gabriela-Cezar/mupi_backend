@@ -1,3 +1,5 @@
+from urllib.parse import parse_qs, urlparse
+
 import polyline
 import pytest
 
@@ -9,9 +11,13 @@ from app.model.mupi_object import MupiObject
 from app.model.theme import Theme
 from app.model.user_badge import UserBadge
 from app.model.user_visit import UserVisit
+from app.core import config
+from app.service import storage_service
 from app.service.proximity_service import PROXIMITY_RADIUS_M
 
-PNG = b"\x89PNG\r\n\x1a\n" + b"conteudo-da-imagem"
+FOTO = "points/1/photo-abc.png"
+FOTO_INATIVO = "points/2/photo-def.png"
+IMAGEM_INSIGNIA = "badges/1/image-ghi.png"
 
 LAT, LNG = -23.5505, -46.6333
 PERTO = {"latitude": LAT, "longitude": LNG}
@@ -37,8 +43,7 @@ def insignia_do_ponto(db_session):
         name="Visitou o Edifício",
         description="Segredo até chegar",
         rule_type=BadgeRule.MANUAL,
-        image=PNG,
-        image_mime_type="image/png",
+        image_key=IMAGEM_INSIGNIA,
     )
     db_session.add(insignia)
     db_session.commit()
@@ -54,9 +59,9 @@ def ponto(db_session, tema, insignia_do_ponto):
         longitude=LNG,
         active=True,
         theme_id=tema.id,
+        photo_key=FOTO,
         badges=[insignia_do_ponto],
         media=[
-            MupiObjectMedia(type=MediaType.IMAGE, data=PNG, mime_type="image/png", title="foto.png"),
             MupiObjectMedia(type=MediaType.VIDEO, url="https://youtu.be/abc123"),
         ],
     )
@@ -73,7 +78,7 @@ def ponto_inativo(db_session):
         latitude=LAT,
         longitude=LNG,
         active=False,
-        media=[MupiObjectMedia(type=MediaType.IMAGE, data=PNG, mime_type="image/png")],
+        photo_key=FOTO_INATIVO,
     )
     db_session.add(ponto)
     db_session.commit()
@@ -88,8 +93,17 @@ def ponto_sem_midia(db_session):
     return ponto
 
 
-def foto(ponto):
-    return next(m for m in ponto.media if m.type == MediaType.IMAGE)
+def link_assinado(url, chave, validade=storage_service.IMAGE_URL_SECONDS):
+    """O link é do bucket, aponta para a chave e é temporário e assinado."""
+    partes = urlparse(url)
+    consulta = parse_qs(partes.query)
+
+    assert partes.scheme == "https"
+    assert "mupi-testes" in partes.netloc + partes.path
+    assert partes.path.endswith("/" + chave)
+    assert consulta["X-Amz-Expires"] == [str(validade)]
+    assert "X-Amz-Signature" in consulta
+    return True
 
 
 def abrir(client, ponto, posicao=PERTO):
@@ -103,9 +117,6 @@ ROTAS_GET = [
     f"/mupi-objects/nearby?latitude={LAT}&longitude={LNG}&radius=1000",
     f"/mupi-objects/search?name=Edi&latitude={LAT}&longitude={LNG}",
     f"/mupi-objects/1/route?latitude={LAT}&longitude={LNG}",
-    "/mupi-objects/media/1",
-    "/mupi-objects/1/image",
-    "/mupi-objects/badges/1/image",
 ]
 
 
@@ -151,13 +162,13 @@ def test_lista_traz_so_o_resumo(user_client, ponto):
     [item] = user_client.get("/mupi-objects").json()
 
     assert set(item) == CAMPOS_DO_RESUMO
+    assert link_assinado(item.pop("photo_url"), FOTO)
     assert item == {
         "id": ponto.id,
         "name": "Edifício Exemplo",
         "latitude": LAT,
         "longitude": LNG,
         "theme": {"id": ponto.theme_id, "name": "Arte Deco"},
-        "photo_url": f"/mupi-objects/media/{foto(ponto).id}",
         "has_video": True,
         "visited": False,
     }
@@ -249,8 +260,9 @@ def test_abrir_perto_entrega_o_conteudo_completo(user_client, ponto, insignia_do
         "new_visit", "visits_total", "awarded",
     }
     assert dados["description"] == "Texto que só aparece perto do ponto."
-    assert [m["type"] for m in dados["media"]] == ["image", "video"]
-    assert dados["media"][1]["url"] == "https://youtu.be/abc123"
+    assert [m["type"] for m in dados["media"]] == ["video"]
+    assert dados["media"][0]["url"] == "https://youtu.be/abc123"
+    assert link_assinado(dados["photo_url"], FOTO)
     assert [b["name"] for b in dados["badges"]] == ["Visitou o Edifício"]
     assert dados["visited"] is True
 
@@ -333,41 +345,48 @@ def test_abrir_com_posicao_invalida_retorna_422(user_client, ponto, posicao):
     assert abrir(user_client, ponto, posicao).status_code == 422
 
 
-# ---------- Arquivos ----------
+# ---------- Arquivos (links temporários do S3 — INF-04) ----------
 
-def test_foto_e_entregue_ao_usuario_logado(user_client, ponto):
-    resposta = user_client.get(f"/mupi-objects/media/{foto(ponto).id}")
-
-    assert resposta.status_code == 200
-    assert resposta.content == PNG
-    assert resposta.headers["content-type"] == "image/png"
-    assert resposta.headers["cache-control"].startswith("private")
-
-
-def test_foto_de_ponto_inativo_nao_e_entregue(user_client, ponto_inativo):
-    resposta = user_client.get(f"/mupi-objects/media/{foto(ponto_inativo).id}")
-
-    assert resposta.status_code == 404
+@pytest.mark.parametrize("rota", [
+    "/mupi-objects/media/1",
+    "/mupi-objects/1/image",
+    "/mupi-objects/badges/1/image",
+])
+def test_rotas_antigas_de_imagem_foram_removidas(user_client, ponto, rota):
+    """As imagens não passam mais pelo servidor (PT-14)."""
+    assert user_client.get(rota).status_code == 404
 
 
-def test_rota_antiga_de_imagem_nao_entrega_ponto_inativo(user_client, ponto_inativo):
-    """FAL-16: antes a imagem de ponto desativado continuava acessível."""
-    assert user_client.get(f"/mupi-objects/{ponto_inativo.id}/image").status_code == 404
+def test_imagem_da_insignia_vem_como_link_assinado(user_client, ponto, insignia_do_ponto):
+    [insignia] = abrir(user_client, ponto).json()["badges"]
+
+    assert link_assinado(insignia["image_url"], IMAGEM_INSIGNIA)
 
 
-def test_rota_antiga_de_imagem_funciona_para_ponto_ativo(user_client, ponto):
-    resposta = user_client.get(f"/mupi-objects/{ponto.id}/image")
+def test_insignia_sem_imagem_vem_sem_link(user_client, db_session, ponto, insignia_do_ponto):
+    insignia_do_ponto.image_key = None
+    db_session.commit()
 
-    assert resposta.status_code == 200
-    assert resposta.headers["cache-control"].startswith("private")
+    [insignia] = abrir(user_client, ponto).json()["badges"]
+
+    assert insignia["image_url"] is None
 
 
-def test_imagem_da_insignia_e_entregue_ao_usuario_logado(user_client, insignia_do_ponto):
-    resposta = user_client.get(f"/mupi-objects/badges/{insignia_do_ponto.id}/image")
+def test_o_mesmo_link_e_reaproveitado_entre_chamadas(user_client, ponto):
+    """Link novo a cada chamada faria o celular baixar a foto de novo."""
+    primeiro = user_client.get("/mupi-objects").json()[0]["photo_url"]
+    segundo = user_client.get("/mupi-objects").json()[0]["photo_url"]
 
-    assert resposta.status_code == 200
-    assert resposta.content == PNG
-    assert resposta.headers["cache-control"].startswith("private")
+    assert primeiro == segundo
+
+
+def test_sem_s3_configurado_a_foto_vem_vazia(user_client, ponto, monkeypatch):
+    """O app mostra a imagem padrão em vez de quebrar."""
+    monkeypatch.setattr(config, "S3_BUCKET", None)
+
+    [item] = user_client.get("/mupi-objects").json()
+
+    assert item["photo_url"] is None
 
 
 # ---------- Rota a pé até o ponto ----------

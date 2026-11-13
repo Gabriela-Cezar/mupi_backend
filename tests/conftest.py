@@ -7,11 +7,19 @@ os.environ["SECRET_KEY"] = "chave-secreta-apenas-para-testes"
 # Como em produção: nenhum site de fora liberado no CORS
 os.environ["CORS_ALLOWED_ORIGINS"] = ""
 os.environ.pop("CORS_ALLOWED_ORIGIN_REGEX", None)
+# S3 simulado pelo moto (fixture s3_simulado): credenciais falsas, nunca as reais
+os.environ["S3_BUCKET"] = "mupi-testes"
+os.environ["AWS_REGION"] = "sa-east-1"
+os.environ["AWS_ACCESS_KEY_ID"] = "testing"
+os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
+os.environ.pop("S3_ENDPOINT_URL", None)
 
 import re  # noqa: E402
 from datetime import timedelta  # noqa: E402
 
+import boto3  # noqa: E402
 import pytest  # noqa: E402
+from moto import mock_aws  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import create_engine  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
@@ -36,7 +44,9 @@ from app.database.database import Base, get_db  # noqa: E402
 from app.model.admin import Admin  # noqa: E402
 from app.model.email_code import EmailCode  # noqa: E402
 from app.model.user import User  # noqa: E402
+from app.core import config  # noqa: E402
 from app.service import auth_user_email_service as codigos  # noqa: E402
+from app.service import storage_service  # noqa: E402
 from app.service.auth_service import gerar_password_hash  # noqa: E402
 from main import app  # noqa: E402
 
@@ -61,6 +71,35 @@ def limpar_estado_em_memoria():
     limpar()
     yield
     limpar()
+
+
+BUCKET_DE_TESTE = "mupi-testes"
+
+
+@pytest.fixture(autouse=True)
+def s3_simulado(monkeypatch):
+    """Todo teste usa um S3 falso e vazio (moto); nada chega à AWS."""
+    monkeypatch.setattr(config, "S3_BUCKET", BUCKET_DE_TESTE)
+    monkeypatch.setattr(config, "AWS_REGION", "sa-east-1")
+    monkeypatch.setattr(config, "AWS_ACCESS_KEY_ID", "testing")
+    monkeypatch.setattr(config, "AWS_SECRET_ACCESS_KEY", "testing")
+    monkeypatch.setattr(config, "S3_ENDPOINT_URL", None)
+
+    with mock_aws():
+        storage_service.reset()
+        s3 = boto3.client("s3", region_name="sa-east-1")
+        s3.create_bucket(
+            Bucket=BUCKET_DE_TESTE,
+            CreateBucketConfiguration={"LocationConstraint": "sa-east-1"},
+        )
+        yield s3
+        storage_service.reset()
+
+
+def chaves_no_bucket(s3) -> list[str]:
+    """As chaves de todos os arquivos guardados no bucket de teste."""
+    resposta = s3.list_objects_v2(Bucket=BUCKET_DE_TESTE)
+    return sorted(item["Key"] for item in resposta.get("Contents", []))
 
 
 @pytest.fixture

@@ -38,10 +38,11 @@ App:
 
 Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia dependem dela.
 
-- [ ] **Backend:** novas variáveis em `config.py` e `.env.example` (INF-03)
-- [ ] **Backend:** `storage_service` com `boto3`: salvar, gerar link assinado, apagar (INF-04)
-- [ ] **Backend:** script que move as imagens do banco para o S3 e migração que remove as colunas `data`/`image` (INF-04)
-- [ ] **App:** confirmar que o `AuthenticatedImage` funciona com link assinado completo (`https://...`) (APP-MAP-06)
+- [x] **Backend:** novas variáveis em `config.py` e `.env.example` (INF-03)
+- [x] **Backend:** `storage_service` com `boto3`: salvar, gerar link assinado, apagar (INF-04)
+- [x] **Backend:** script que move as imagens do banco para o S3 e migração que remove as colunas `data`/`image` (INF-04) — migrações 0006/0007; a foto do ponto já fica em `mupi_objects.photo_key` (adianta parte da PT-05)
+- [ ] **Externo:** criar o bucket de desenvolvimento e o usuário IAM; rodar `alembic upgrade 0006` → `python -m app.scripts.move_images_to_s3` → `alembic upgrade head`
+- [x] **App:** confirmar que o `AuthenticatedImage` funciona com link assinado completo (`https://...`) (APP-MAP-06) — já coberto por teste; nenhuma mudança necessária
 
 ## Etapa 2 — Novo modelo do ponto, painel e mapa
 

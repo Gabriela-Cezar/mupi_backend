@@ -16,6 +16,7 @@ Requisitos que não são funcionalidades visíveis, mas são necessários para o
 - README com: como instalar, configurar o `.env`, rodar migrações, criar administrador e iniciar o servidor.
 
 ### INF-03 — Configuração [MVP]
+- **Situação:** 🟡 Em andamento (S3 e credenciais AWS no `config.py` e no `.env.example` na Etapa 1; distância de proximidade e Client IDs do Google entram nas Etapas 3 e 6)
 - Todas as configurações em `app/core/config.py`, lidas do `.env` (corrige FAL-18).
 - Novas variáveis: distância de proximidade, origens CORS permitidas, Client IDs do Google, nome do bucket e região do S3, credenciais AWS (quando não vierem de role), chave do OpenRouteService.
 - `.env.example` versionado com todas as variáveis e sem valores reais.
@@ -24,6 +25,7 @@ Requisitos que não são funcionalidades visíveis, mas são necessários para o
 ## Arquivos (fotos e áudios)
 
 ### INF-04 — Armazenamento de arquivos: Amazon S3 [MVP — decidido]
+- **Situação:** ✅ Código pronto (Etapa 1, 12/11/2026): `app/service/storage_service.py`; foto do ponto em `mupi_objects.photo_key` e imagem da insígnia em `badges.image_key`; migrações 0006 e 0007 + `python -m app.scripts.move_images_to_s3`; o mesmo link é reaproveitado enquanto vale mais da metade do prazo (o celular não baixa a foto de novo a cada recarga); testes com S3 simulado (`moto`). Links pelo endereço regional (`bucket.s3.sa-east-1.amazonaws.com`). Passo a passo da AWS e políticas em `infra/aws/`; verificação do bucket com `python -m app.scripts.check_storage`. Migração 0006 aplicada no banco de desenvolvimento em 12/11/2026. **Falta (externo):** criar o bucket e o usuário IAM, rodar o script e a 0007.
 - Volume estimado no lançamento: 40 fotos (até 5 MB cada), capas de rotas, imagens de insígnias e alguns áudios (a maioria dos pontos não terá; cada um até ~20 MB).
 - **Decisão:** arquivos no **Amazon S3**, na mesma região da API; no banco fica só a chave (caminho) do arquivo.
 - Bucket **privado** (sem acesso público). O app recebe **links temporários assinados** (presigned URLs):

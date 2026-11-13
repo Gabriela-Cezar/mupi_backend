@@ -6,13 +6,12 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
-    LargeBinary,
     String,
     Text,
     func,
     Enum as SQLEnum,
 )
-from sqlalchemy.orm import deferred, relationship
+from sqlalchemy.orm import relationship
 
 from app.database.database import Base
 
@@ -43,15 +42,9 @@ class Badge(Base):
         nullable=True
     )
 
-    image = deferred(
-        Column(
-            LargeBinary,
-            nullable=True
-        )
-    )
-
-    image_mime_type = Column(
-        String(100),
+    # Chave da imagem no S3 (INF-04)
+    image_key = Column(
+        String(300),
         nullable=True
     )
 

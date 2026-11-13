@@ -41,3 +41,16 @@ CORS_ALLOWED_ORIGIN_REGEX = os.getenv("CORS_ALLOWED_ORIGIN_REGEX") or None
 # (botão "Como chegar"). Opcional: sem ela o servidor sobe normalmente,
 # e só essa rota responde com erro explicando que falta a chave.
 OPENROUTESERVICE_API_KEY = _optional("OPENROUTESERVICE_API_KEY")
+
+# ---------- Arquivos (fotos, áudios, imagens de insígnia) no Amazon S3 (INF-04) ----------
+# Opcional: sem S3_BUCKET o servidor sobe normalmente, mas o painel recusa o
+# envio de arquivos e o app recebe as imagens como ausentes (photo_url nulo).
+S3_BUCKET = _optional("S3_BUCKET")
+# Região do bucket. Padrão: São Paulo (INF-05).
+AWS_REGION = _optional("AWS_REGION") or "sa-east-1"
+# Credenciais do usuário IAM da aplicação (só PutObject/GetObject/DeleteObject
+# neste bucket). Sem elas, o boto3 procura no ~/.aws/credentials do servidor.
+AWS_ACCESS_KEY_ID = _optional("AWS_ACCESS_KEY_ID")
+AWS_SECRET_ACCESS_KEY = _optional("AWS_SECRET_ACCESS_KEY")
+# Só para desenvolvimento com um S3 local (ex.: MinIO em Docker). Vazio = AWS.
+S3_ENDPOINT_URL = _optional("S3_ENDPOINT_URL")

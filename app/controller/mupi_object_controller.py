@@ -11,7 +11,6 @@ from fastapi import (
     HTTPException,
     Query,
     Request,
-    Response,
     UploadFile,
 )
 from pydantic import BaseModel, Field
@@ -28,6 +27,7 @@ from app.controller.serializers import (
 from app.core.admin_auth import require_admin_with_csrf
 from app.core.config import OPENROUTESERVICE_API_KEY
 from app.core.dependencies import get_current_user
+from app.core.file_types import sniff_image_mime
 from app.core.templates import templates
 from app.database.database import get_db
 from app.model.badge import Badge, BadgeRule
@@ -37,6 +37,7 @@ from app.model.mupi_object import MupiObject
 from app.model.mupi_object_badge import MupiObjectBadge  # noqa: F401  (registra a tabela de associação)
 from app.model.user import User
 from app.model.user_visit import UserVisit
+from app.service import storage_service
 from app.service.badge_service import register_visit, visit_counts
 from app.service.proximity_service import (
     bounding_box,
@@ -80,17 +81,6 @@ def parse_optional_int(value: str | None, field: str) -> int | None:
             detail=f"Valor inválido para {field}."
         )
         
-def sniff_image_mime(data: bytes) -> str | None:
-    """Detecta o tipo real pelo conteúdo, sem confiar no que o cliente declarou."""
-    if data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "image/png"
-    if data.startswith(b"\xff\xd8\xff"):
-        return "image/jpeg"
-    if data[:4] == b"RIFF" and data[8:12] == b"WEBP":
-        return "image/webp"
-    return None
-
-
 def read_image(upload: UploadFile) -> tuple[bytes, str]:
     data = upload.file.read(MAX_IMAGE_BYTES + 1)
 
@@ -109,6 +99,42 @@ def read_image(upload: UploadFile) -> tuple[bytes, str]:
         )
 
     return data, mime_type
+
+
+def store_file(
+    db: Session, prefix: str, name: str, data: bytes, content_type: str
+) -> str:
+    """Envia o arquivo ao S3 e devolve a chave, com erro claro para o painel.
+
+    Se o envio falhar, desfaz o que estava pendente no banco.
+    """
+    key = storage_service.build_key(prefix, name, content_type)
+
+    try:
+        return storage_service.save(key, data, content_type)
+    except storage_service.StorageNotConfigured:
+        db.rollback()
+        raise HTTPException(
+            status_code=503,
+            detail="Armazenamento de arquivos não configurado (S3_BUCKET)."
+        )
+    except storage_service.StorageError:
+        db.rollback()
+        logger.exception("Erro ao enviar arquivo para o S3")
+        raise HTTPException(
+            status_code=502,
+            detail="Não foi possível salvar o arquivo. Tente novamente."
+        )
+
+
+def commit_or_delete_file(db: Session, key: str | None) -> None:
+    """Grava no banco; se falhar, apaga o arquivo recém-enviado ao S3."""
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        storage_service.delete_quietly(key)
+        raise
 
 
 def is_valid_http_url(url: str) -> bool:
@@ -347,55 +373,6 @@ def get_mupi_route(
     }
 
 
-@mupi_object_api_router.get("/badges/{badge_id}/image")
-def get_badge_image(
-    badge_id: int,
-    db: Session = Depends(get_db)
-):
-    badge = (
-        db.query(Badge)
-        .filter(Badge.id == badge_id)
-        .first()
-    )
-
-    if not badge or not badge.image:
-        return Response(status_code=404)
-
-    return Response(
-        content=badge.image,
-        media_type=badge.image_mime_type or "image/png",
-        headers={"Cache-Control": "private, max-age=86400"}
-    )
-
-
-@mupi_object_api_router.get("/{object_id}/image")
-def get_mupi_object_image(
-    object_id: int,
-    db: Session = Depends(get_db)
-):
-    media = (
-        db.query(MupiObjectMedia)
-        .join(MupiObject, MupiObject.id == MupiObjectMedia.object_id)
-        .filter(
-            MupiObject.active.is_(True),
-            MupiObjectMedia.object_id == object_id,
-            MupiObjectMedia.type == MediaType.IMAGE,
-            MupiObjectMedia.data.isnot(None)
-        )
-        .order_by(MupiObjectMedia.id)
-        .first()
-    )
-
-    if not media:
-        return Response(status_code=404)
-
-    return Response(
-        content=media.data,
-        media_type=media.mime_type or "image/png",
-        headers={"Cache-Control": "private, max-age=3600"}
-    )
-
-
 @router.get("/search")
 def admin_search_mupi_objects(
     name: str = Query(..., min_length=1, max_length=100),
@@ -446,20 +423,20 @@ def mupi_object_form(
     )
 
 
-async def uploaded_images(request: Request) -> list[UploadFile]:
-    """Imagens enviadas no campo "images", ignorando o campo vazio.
+async def uploaded_photo(request: Request) -> UploadFile | None:
+    """Foto enviada no campo "photo", ignorando o campo vazio.
 
-    Sem imagem escolhida, o navegador envia o campo de arquivo vazio, que
-    chega como texto. Declarado como list[UploadFile], o FastAPI recusava o
-    cadastro inteiro com erro 422 e o ponto não era salvo.
+    Sem arquivo escolhido, o navegador envia o campo vazio, que chega como
+    texto. Declarado como UploadFile, o FastAPI recusaria o cadastro inteiro
+    com erro 422 e o ponto não seria salvo.
     """
     form = await request.form()
+    item = form.get("photo")
 
-    return [
-        item
-        for item in form.getlist("images")
-        if isinstance(item, StarletteUploadFile) and item.filename
-    ]
+    if isinstance(item, StarletteUploadFile) and item.filename:
+        return item
+
+    return None
 
 
 @router.post("/mupi-objects")
@@ -471,7 +448,7 @@ def create_mupi_object(
     active: bool = Form(False),
     badge_ids: list[int] = Form([]),
     video_urls: str = Form(""),
-    images: list[UploadFile] = Depends(uploaded_images),
+    photo: UploadFile | None = Depends(uploaded_photo),
     db: Session = Depends(get_db),
     theme_id: str = Form(""),
 ):
@@ -508,19 +485,10 @@ def create_mupi_object(
                 )
             )
 
+    # Valida a foto antes de gravar qualquer coisa
+    photo_file = read_image(photo) if photo is not None else None
+
     media_items = []
-
-    for image in images:
-        image_data, mime_type = read_image(image)
-
-        media_items.append(
-            MupiObjectMedia(
-                type=MediaType.IMAGE,
-                data=image_data,
-                mime_type=mime_type,
-                title=image.filename[:150]
-            )
-        )
 
     for line in video_urls.splitlines():
         url = line.strip()
@@ -553,12 +521,16 @@ def create_mupi_object(
     )
 
     db.add(mupi_object)
+    # Gera o id do ponto, usado no caminho da foto no S3
+    db.flush()
 
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        raise
+    if photo_file is not None:
+        photo_data, photo_mime = photo_file
+        mupi_object.photo_key = store_file(
+            db, f"points/{mupi_object.id}", "photo", photo_data, photo_mime
+        )
+
+    commit_or_delete_file(db, mupi_object.photo_key)
 
     db.refresh(mupi_object)
 
@@ -627,17 +599,11 @@ def create_badge(
                 detail="Selecione um tema válido para esta regra."
             )
 
-    image_data = None
-    image_mime_type = None
-
-    if image and image.filename:
-        image_data, image_mime_type = read_image(image)
+    image_file = read_image(image) if image and image.filename else None
 
     badge = Badge(
         name=name,
         description=description,
-        image=image_data,
-        image_mime_type=image_mime_type,
         rule_type=rule,
         required_count=count,
         theme_id=theme
@@ -646,7 +612,8 @@ def create_badge(
     db.add(badge)
 
     try:
-        db.commit()
+        # Gera o id da insígnia, usado no caminho da imagem no S3
+        db.flush()
     except IntegrityError:
         db.rollback()
 
@@ -655,6 +622,14 @@ def create_badge(
             detail="Já existe uma insígnia com esse nome."
         )
 
+    if image_file is not None:
+        image_data, image_mime = image_file
+        badge.image_key = store_file(
+            db, f"badges/{badge.id}", "image", image_data, image_mime
+        )
+
+    commit_or_delete_file(db, badge.image_key)
+
     db.refresh(badge)
 
     return {
@@ -662,27 +637,3 @@ def create_badge(
         "id": badge.id
     }
     
-@mupi_object_api_router.get("/media/{media_id}")
-def get_media_file(
-    media_id: int,
-    db: Session = Depends(get_db)
-):
-    media = (
-        db.query(MupiObjectMedia)
-        .join(MupiObject, MupiObject.id == MupiObjectMedia.object_id)
-        .filter(
-            MupiObjectMedia.id == media_id,
-            MupiObjectMedia.data.isnot(None),
-            MupiObject.active.is_(True),
-        )
-        .first()
-    )
-
-    if not media:
-        return Response(status_code=404)
-
-    return Response(
-        content=media.data,
-        media_type=media.mime_type or "image/png",
-        headers={"Cache-Control": "private, max-age=3600"}
-    )

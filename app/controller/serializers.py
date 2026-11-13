@@ -10,6 +10,7 @@ from app.model.badge import Badge
 from app.model.midia import MediaType, MupiObjectMedia
 from app.model.mupi_object import MupiObject
 from app.model.user_badge import UserBadge
+from app.service import storage_service
 
 
 # ---------- Insígnias ----------
@@ -19,12 +20,8 @@ def serialize_badge(badge: Badge) -> dict:
         "id": badge.id,
         "name": badge.name,
         "description": badge.description,
-        # image_mime_type só existe quando há imagem, então não carrega o blob
-        "image_url": (
-            f"/mupi-objects/badges/{badge.id}/image"
-            if badge.image_mime_type
-            else None
-        ),
+        # Link temporário do S3 (INF-04)
+        "image_url": storage_service.url(badge.image_key),
     }
 
 
@@ -58,30 +55,21 @@ def serialize_collected(item: UserBadge) -> dict:
 
 # ---------- Mídias ----------
 
-def media_file_url(media: MupiObjectMedia) -> str:
-    return f"/mupi-objects/media/{media.id}"
-
-
 def serialize_media(media: MupiObjectMedia) -> dict:
-    # Sem url significa que o binário está no banco (data XOR url)
+    # Só vídeos: a foto do ponto fica em photo_url
     return {
         "id": media.id,
         "object_id": media.object_id,
         "type": media.type.value,
-        "url": media.url or media_file_url(media),
+        "url": media.url,
         "title": media.title,
         "description": media.description,
     }
 
 
 def _photo_url(obj: MupiObject) -> str | None:
-    """A foto do ponto (primeira imagem). Aparece no mapa, mesmo de longe."""
-    for media in obj.media:
-        # url vazia = arquivo guardado no banco (não carrega o blob para checar)
-        if media.type == MediaType.IMAGE and media.url is None:
-            return media_file_url(media)
-
-    return None
+    """Link temporário da foto do ponto. Aparece no mapa, mesmo de longe."""
+    return storage_service.url(obj.photo_key)
 
 
 # ---------- Ponto MUPI ----------

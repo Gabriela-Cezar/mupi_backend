@@ -1,18 +1,16 @@
 from enum import Enum
 
 from sqlalchemy import (
-    CheckConstraint,
     Column,
     DateTime,
     ForeignKey,
     Integer,
-    LargeBinary,
     String,
     Text,
     Enum as SQLEnum,
     func,
 )
-from sqlalchemy.orm import deferred, relationship
+from sqlalchemy.orm import relationship
 
 from app.database.database import Base
 
@@ -47,21 +45,10 @@ class MupiObjectMedia(Base):
         nullable=False
     )
 
-    data = deferred(
-        Column(
-            LargeBinary,
-            nullable=True
-        )
-    )
-
-    mime_type = Column(
-        String(100),
-        nullable=True
-    )
-
+    # Só vídeos ficam aqui; a foto do ponto está em mupi_objects.photo_key (INF-04)
     url = Column(
         String(500),
-        nullable=True
+        nullable=False
     )
 
     title = Column(
@@ -83,11 +70,4 @@ class MupiObjectMedia(Base):
     object = relationship(
         "MupiObject",
         back_populates="media"
-    )
-
-    __table_args__ = (
-        CheckConstraint(
-            "(data IS NOT NULL) <> (url IS NOT NULL)",
-            name="ck_mupi_object_media_data_xor_url"
-        ),
     )

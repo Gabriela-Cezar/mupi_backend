@@ -1,8 +1,13 @@
+import re
+
 import pytest
 
+from app.core import config
 from app.model.badge import Badge, BadgeRule
 from app.model.mupi_object import MupiObject
 from app.model.theme import Theme
+from app.service import storage_service
+from tests.conftest import BUCKET_DE_TESTE, chaves_no_bucket
 
 
 @pytest.fixture
@@ -250,9 +255,10 @@ def test_ponto_recusa_insignia_de_contagem(client, db_session, insignias, tipo):
     assert db_session.query(MupiObject).count() == 0
 
 
-# ---------- Cadastro de ponto: campo de imagem como o navegador envia ----------
+# ---------- Cadastro de ponto: foto enviada ao S3 (INF-04) ----------
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"conteudo-da-imagem"
+JPEG = b"\xff\xd8\xff" + b"conteudo-da-imagem"
 CAMPO_DE_ARQUIVO_VAZIO = ("", b"", "application/octet-stream")
 
 
@@ -261,56 +267,118 @@ def ponto_salvo(db_session):
     return db_session.query(MupiObject).one()
 
 
-def test_ponto_sem_imagem_e_salvo(client, db_session):
-    """Sem imagem escolhida, o navegador envia o campo de arquivo vazio.
+def test_ponto_sem_foto_e_salvo(client, db_session, s3_simulado):
+    """Sem foto escolhida, o navegador envia o campo de arquivo vazio.
 
     Antes era recusado com 422 e o ponto não era salvo.
     """
     resposta = client.post(
         "/admin/mupi-objects",
         data=dados_do_ponto(name="Unigoias"),
-        files={"images": CAMPO_DE_ARQUIVO_VAZIO},
+        files={"photo": CAMPO_DE_ARQUIVO_VAZIO},
     )
 
     assert resposta.status_code == 200
     ponto = ponto_salvo(db_session)
     assert ponto.name == "Unigoias"
-    assert ponto.media == []
+    assert ponto.photo_key is None
+    assert chaves_no_bucket(s3_simulado) == []
 
 
-def test_ponto_sem_nenhum_campo_de_imagem_e_salvo(client, db_session):
+def test_ponto_sem_nenhum_campo_de_foto_e_salvo(client, db_session):
     resposta = client.post("/admin/mupi-objects", data=dados_do_ponto())
 
     assert resposta.status_code == 200
-    assert ponto_salvo(db_session).media == []
+    assert ponto_salvo(db_session).photo_key is None
 
 
-def test_ponto_com_imagem_salva_a_imagem(client, db_session):
+def test_foto_vai_para_o_s3_e_o_banco_guarda_so_a_chave(client, db_session, s3_simulado):
     resposta = client.post(
         "/admin/mupi-objects",
         data=dados_do_ponto(),
-        files={"images": ("foto.png", PNG, "image/png")},
+        files={"photo": ("foto.png", PNG, "image/png")},
     )
 
     assert resposta.status_code == 200
-    [midia] = ponto_salvo(db_session).media
-    assert midia.mime_type == "image/png"
-    assert midia.title == "foto.png"
+    ponto = ponto_salvo(db_session)
+    assert re.fullmatch(rf"points/{ponto.id}/photo-[0-9a-f]{{32}}\.png", ponto.photo_key)
+    assert chaves_no_bucket(s3_simulado) == [ponto.photo_key]
+
+    arquivo = s3_simulado.get_object(Bucket=BUCKET_DE_TESTE, Key=ponto.photo_key)
+    assert arquivo["Body"].read() == PNG
+    assert arquivo["ContentType"] == "image/png"
 
 
-def test_imagem_vazia_entre_imagens_validas_e_ignorada(client, db_session):
+def test_tipo_da_foto_vem_do_conteudo_e_nao_do_nome(client, db_session, s3_simulado):
+    """Um JPEG chamado "foto.png" é guardado como JPEG."""
+    client.post(
+        "/admin/mupi-objects",
+        data=dados_do_ponto(),
+        files={"photo": ("foto.png", JPEG, "image/png")},
+    )
+
+    chave = ponto_salvo(db_session).photo_key
+    assert chave.endswith(".jpg")
+    assert s3_simulado.get_object(Bucket=BUCKET_DE_TESTE, Key=chave)["ContentType"] == "image/jpeg"
+
+
+def test_arquivo_que_nao_e_imagem_e_recusado(client, db_session, s3_simulado):
     resposta = client.post(
         "/admin/mupi-objects",
         data=dados_do_ponto(),
-        files=[
-            ("images", ("foto1.png", PNG, "image/png")),
-            ("images", CAMPO_DE_ARQUIVO_VAZIO),
-            ("images", ("foto2.png", PNG, "image/png")),
-        ],
+        files={"photo": ("foto.png", b"nao sou imagem", "image/png")},
     )
 
-    assert resposta.status_code == 200
-    assert [m.title for m in ponto_salvo(db_session).media] == ["foto1.png", "foto2.png"]
+    assert resposta.status_code == 400
+    assert db_session.query(MupiObject).count() == 0
+    assert chaves_no_bucket(s3_simulado) == []
+
+
+def test_sem_s3_configurado_a_foto_e_recusada_com_mensagem(client, db_session, monkeypatch):
+    monkeypatch.setattr(config, "S3_BUCKET", None)
+
+    resposta = client.post(
+        "/admin/mupi-objects",
+        data=dados_do_ponto(),
+        files={"photo": ("foto.png", PNG, "image/png")},
+    )
+
+    assert resposta.status_code == 503
+    assert "S3_BUCKET" in resposta.json()["detail"]
+    assert db_session.query(MupiObject).count() == 0
+
+
+def test_falha_do_s3_nao_salva_o_ponto(client, db_session, monkeypatch):
+    def s3_fora_do_ar(*args, **kwargs):
+        raise storage_service.StorageError("fora do ar")
+
+    monkeypatch.setattr(storage_service, "save", s3_fora_do_ar)
+
+    resposta = client.post(
+        "/admin/mupi-objects",
+        data=dados_do_ponto(),
+        files={"photo": ("foto.png", PNG, "image/png")},
+    )
+
+    assert resposta.status_code == 502
+    assert db_session.query(MupiObject).count() == 0
+
+
+def test_falha_no_banco_apaga_a_foto_ja_enviada(client, db_session, s3_simulado, monkeypatch):
+    """Sem isso, ficaria no bucket um arquivo que nenhum ponto usa."""
+    def commit_que_falha():
+        raise RuntimeError("banco fora do ar")
+
+    monkeypatch.setattr(db_session, "commit", commit_que_falha)
+
+    with pytest.raises(RuntimeError):
+        client.post(
+            "/admin/mupi-objects",
+            data=dados_do_ponto(),
+            files={"photo": ("foto.png", PNG, "image/png")},
+        )
+
+    assert chaves_no_bucket(s3_simulado) == []
 
 
 def test_formulario_completo_como_o_navegador_envia(admin_client, db_session):
@@ -329,8 +397,48 @@ def test_formulario_completo_como_o_navegador_envia(admin_client, db_session):
             video_urls="",
             csrf_token=csrf,
         ),
-        files={"images": CAMPO_DE_ARQUIVO_VAZIO},
+        files={"photo": CAMPO_DE_ARQUIVO_VAZIO},
     )
 
     assert resposta.status_code == 200
     assert ponto_salvo(db_session).name == "Unigoias"
+
+
+# ---------- Imagem da insígnia no S3 (INF-04) ----------
+
+def test_imagem_da_insignia_vai_para_o_s3(client, db_session, s3_simulado):
+    resposta = client.post(
+        "/admin/badges",
+        data={"name": "Explorador", "rule_type": "manual"},
+        files={"image": ("insignia.png", PNG, "image/png")},
+    )
+
+    assert resposta.status_code == 200
+    insignia = db_session.get(Badge, resposta.json()["id"])
+    assert re.fullmatch(rf"badges/{insignia.id}/image-[0-9a-f]{{32}}\.png", insignia.image_key)
+    assert chaves_no_bucket(s3_simulado) == [insignia.image_key]
+
+
+def test_insignia_sem_imagem_nao_envia_nada(client, db_session, s3_simulado):
+    resposta = client.post(
+        "/admin/badges",
+        data={"name": "Explorador", "rule_type": "manual"},
+        files={"image": CAMPO_DE_ARQUIVO_VAZIO},
+    )
+
+    assert resposta.status_code == 200
+    assert db_session.get(Badge, resposta.json()["id"]).image_key is None
+    assert chaves_no_bucket(s3_simulado) == []
+
+
+def test_insignia_com_nome_repetido_nao_envia_a_imagem(client, db_session, s3_simulado):
+    client.post("/admin/badges", data={"name": "Explorador", "rule_type": "manual"})
+
+    resposta = client.post(
+        "/admin/badges",
+        data={"name": "Explorador", "rule_type": "manual"},
+        files={"image": ("insignia.png", PNG, "image/png")},
+    )
+
+    assert resposta.status_code == 400
+    assert chaves_no_bucket(s3_simulado) == []

@@ -50,6 +50,12 @@ class MupiObject(Base):
         index=True
     )
 
+    # Chave da foto no S3 (PT-05, INF-04). Uma foto por ponto.
+    photo_key = Column(
+        String(300),
+        nullable=True
+    )
+
     theme_id = Column(
         Integer,
         ForeignKey("themes.id", ondelete="SET NULL"),
