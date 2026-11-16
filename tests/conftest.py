@@ -245,3 +245,7 @@ def user_client(app_de_teste, usuario, emails_enviados):
     with TestClient(app_de_teste, base_url=BASE_URL) as test_client:
         test_client.headers["Authorization"] = f"Bearer {token}"
         yield test_client
+
+
+# OpenRouteService simulado para os testes de rota (fixture `ors`)
+from tests.ors_falso import ors  # noqa: E402, F401

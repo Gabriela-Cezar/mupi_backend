@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{% if editing %}Editar{% else %}Cadastrar{% endif %} rota</title>
+    <link rel="stylesheet" href="/admin-static/style.css">
+    {% if saved and saved.has_path %}
+        <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+              integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="">
+    {% endif %}
+</head>
+
+<body>
+
+{% include "admin/_admin_header.html" %}
+
+{% set selected_themes = route.theme_ids %}
+
+<div class="container">
+
+    <p><a href="/admin/routes">← Voltar para a lista</a></p>
+
+    <h1>{% if editing %}Editar rota{% else %}Cadastrar rota{% endif %}</h1>
+
+    {% include "admin/_messages.html" %}
+
+    {% if editing and problems %}
+        <div class="problems">
+            <strong>Para ativar a rota, falta:</strong>
+            <ul>
+                {% for problem in problems %}<li>{{ problem }}</li>{% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+
+
+    {% if editing %}
+        <h2>Trajeto</h2>
+
+        {% if saved.has_path %}
+            <p>
+                <strong>{{ saved.distance_m | km }}</strong> a pé,
+                cerca de <strong>{{ ((saved.walk_seconds or 0) / 60) | round | int }} min</strong> de caminhada
+                (sem contar o tempo em cada ponto).
+            </p>
+            <div id="route-map" class="route-map"></div>
+        {% else %}
+            <div class="alert alert-error">
+                Sem trajeto.
+                {% if saved.path_error %}{{ saved.path_error }}{% endif %}
+            </div>
+        {% endif %}
+
+        <form action="/admin/routes/{{ saved.id }}/path" method="post" class="inline-form">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="secondary">Recalcular trajeto</button>
+        </form>
+    {% endif %}
+
+
+    <form action="{{ form_action }}" method="post" enctype="multipart/form-data">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <h2>Informações</h2>
+
+        <div class="form-group">
+            <label for="name">Nome</label>
+            <input type="text" id="name" name="name" maxlength="150" required value="{{ route.name }}">
+        </div>
+
+        <div class="form-group">
+            <label for="description">Descrição</label>
+            <textarea id="description" name="description" rows="4">{{ route.description }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="difficulty">Dificuldade</label>
+            <select id="difficulty" name="difficulty" required>
+                {% for value, label in difficulties %}
+                    <option value="{{ value }}" {% if value == route.difficulty %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="age_rating">Classificação indicativa</label>
+            <select id="age_rating" name="age_rating" required>
+                {% for value, label in age_ratings %}
+                    <option value="{{ value }}" {% if value == route.age_rating %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>Temas</label>
+            {% if themes %}
+                <div class="badge-list">
+                    {% for theme in themes %}
+                        <label class="badge-option">
+                            <input type="checkbox" name="theme_ids" value="{{ theme.id }}"
+                                   {% if theme.id | string in selected_themes %}checked{% endif %}>
+                            <span>{{ theme.name }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>Nenhum tema cadastrado.</p>
+            {% endif %}
+        </div>
+
+        <div class="form-group">
+            <label for="estimated_minutes">Tempo estimado (minutos)</label>
+            <input type="number" id="estimated_minutes" name="estimated_minutes" min="1" max="1440" step="1"
+                   value="{{ route.estimated_minutes }}">
+            <p class="hint">
+                Deixe vazio para usar o tempo de caminhada calculado. O tempo de
+                caminhada não inclui o tempo em cada ponto: ajuste se quiser.
+            </p>
+        </div>
+
+
+        <h2>Pontos, na ordem</h2>
+
+        <p>Mínimo de 2 pontos. Só pontos ativos podem entrar. A ordem é a ordem da visita.</p>
+
+        <ol id="route-points" class="route-points">
+            {% for point in selected_points %}
+                <li>
+                    <input type="hidden" name="point_ids" value="{{ point.id }}">
+                    <span class="point-number"></span>
+                    <span class="point-name">
+                        {{ point.name }}{% if not point.active %} <span class="tag tag-warn">desativado</span>{% endif %}
+                    </span>
+                    <button type="button" class="secondary" data-move="-1">Subir</button>
+                    <button type="button" class="secondary" data-move="1">Descer</button>
+                    <button type="button" class="danger" data-remove>Remover</button>
+                </li>
+            {% endfor %}
+        </ol>
+
+        <div class="add-point">
+            <select id="new-point" aria-label="Ponto a adicionar">
+                <option value="">Escolha um ponto para adicionar</option>
+                {% for point in points %}
+                    <option value="{{ point.id }}" {% if not point.active %}disabled{% endif %}>
+                        {{ point.name }}{% if not point.active %} (desativado){% endif %}{% if not point.standalone %} (só em rotas){% endif %}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="button" class="secondary" id="add-point">Adicionar</button>
+        </div>
+
+
+        <h2>Imagem de capa</h2>
+
+        <div class="form-group">
+            {% if cover_url %}
+                <img src="{{ cover_url }}" alt="Capa atual da rota" class="photo-preview">
+            {% endif %}
+
+            <label for="cover">
+                {% if route.cover_key %}Substituir a capa{% else %}Capa{% endif %}
+                (PNG, JPEG ou WebP, até 5 MB). Obrigatória para ativar.
+            </label>
+            <input type="file" id="cover" name="cover" accept="image/png,image/jpeg,image/webp">
+
+            {% if error and not editing %}
+                <p class="hint">Se você tinha escolhido uma imagem, escolha de novo.</p>
+            {% endif %}
+
+            {% if route.cover_key %}
+                <label>
+                    <input type="checkbox" name="remove_cover" value="true">
+                    Remover a capa atual
+                </label>
+            {% endif %}
+        </div>
+
+
+        <h2>Situação</h2>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" name="active" value="true" {% if route.active %}checked{% endif %}>
+                Rota ativa (aparece no app)
+            </label>
+            <p class="hint">Só é ativada com capa, 2 ou mais pontos ativos e trajeto calculado.</p>
+        </div>
+
+        <button type="submit">
+            {% if editing %}Salvar alterações{% else %}Cadastrar rota{% endif %}
+        </button>
+
+    </form>
+
+</div>
+
+
+<template id="point-template">
+    <li>
+        <input type="hidden" name="point_ids">
+        <span class="point-number"></span>
+        <span class="point-name"></span>
+        <button type="button" class="secondary" data-move="-1">Subir</button>
+        <button type="button" class="secondary" data-move="1">Descer</button>
+        <button type="button" class="danger" data-remove>Remover</button>
+    </li>
+</template>
+
+<script>
+    // Pontos da rota: adicionar, remover e reordenar
+    (function () {
+        const list = document.getElementById("route-points");
+        const select = document.getElementById("new-point");
+
+        function chosen() {
+            return Array.from(list.querySelectorAll("input[name=point_ids]")).map(i => i.value);
+        }
+
+        function refresh() {
+            list.querySelectorAll(".point-number").forEach((el, i) => el.textContent = (i + 1) + ".");
+            // O mesmo ponto não entra duas vezes
+            const ids = chosen();
+            Array.from(select.options).forEach(option => {
+                if (option.value) option.hidden = ids.includes(option.value);
+            });
+        }
+
+        document.getElementById("add-point").addEventListener("click", function () {
+            const option = select.options[select.selectedIndex];
+            if (!option || !option.value || option.disabled || chosen().includes(option.value)) return;
+
+            const item = document.getElementById("point-template").content.firstElementChild.cloneNode(true);
+            item.querySelector("input").value = option.value;
+            item.querySelector(".point-name").textContent = option.textContent.trim();
+            list.appendChild(item);
+            select.value = "";
+            refresh();
+        });
+
+        list.addEventListener("click", function (event) {
+            const button = event.target.closest("button");
+            if (!button) return;
+            const item = button.closest("li");
+
+            if (button.hasAttribute("data-remove")) {
+                item.remove();
+            } else if (button.dataset.move === "-1" && item.previousElementSibling) {
+                list.insertBefore(item, item.previousElementSibling);
+            } else if (button.dataset.move === "1" && item.nextElementSibling) {
+                list.insertBefore(item.nextElementSibling, item);
+            }
+            refresh();
+        });
+
+        refresh();
+    })();
+</script>
+
+{% if saved and saved.has_path %}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+            integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+    <script>
+        // Pré-visualização do trajeto salvo (ADM-07)
+        (function () {
+            const path = {{ saved.path | tojson }}.map(([lng, lat]) => [lat, lng]);
+            const points = {{ saved.points | map(attribute="mupi_object") | map(attribute="name") | list | tojson }};
+            const waypoints = {{ saved.waypoints | tojson }};
+
+            const map = L.map("route-map");
+            L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 19,
+                attribution: "&copy; OpenStreetMap",
+            }).addTo(map);
+
+            const line = L.polyline(path, { color: "#2E7D32", weight: 5 }).addTo(map);
+
+            waypoints.forEach((index, i) => {
+                // Texto puro (e não HTML): o nome do ponto não vira código
+                const label = document.createElement("span");
+                label.textContent = (i + 1) + ". " + points[i];
+                L.marker(path[index]).addTo(map).bindTooltip(label);
+            });
+
+            map.fitBounds(line.getBounds(), { padding: [20, 20] });
+        })();
+    </script>
+{% endif %}
+
+</body>
+
+</html>

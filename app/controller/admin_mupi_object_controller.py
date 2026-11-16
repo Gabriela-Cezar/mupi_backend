@@ -39,6 +39,7 @@ from app.model.mupi_object import MupiObject
 from app.model.theme import Theme
 from app.model.user_visit import UserVisit
 from app.service import storage_service
+from app.service.route_service import deactivate_routes_with_point, routes_with_point
 
 LIST_URL = "/admin/mupi-objects"
 
@@ -261,13 +262,16 @@ async def update_point(point_id: int, request: Request, db: Session = Depends(ge
         point.audio_key = None
         point.audio_duration = None
 
+    # Ponto desativado: as rotas que passam por ele também (ROT-02)
+    routes_off = [] if point.active else deactivate_routes_with_point(db, point.id)
+
     commit_or_delete_files(db, sent)
 
     # Substituir ou remover apaga o arquivo anterior (PT-05, PT-06)
     for key in old_keys - {point.photo_key, point.audio_key, None}:
         storage_service.delete_quietly(key)
 
-    return _redirect("point-updated")
+    return _redirect("point-updated-routes" if routes_off else "point-updated")
 
 
 # ---------- Ativar e desativar (ADM-08) ----------
@@ -278,9 +282,15 @@ async def set_point_status(point_id: int, request: Request, db: Session = Depend
     form = await request.form()
 
     point.active = str(form.get("active", "")).lower() == "true"
+
+    # Ponto desativado: as rotas que passam por ele também (ROT-02)
+    routes_off = [] if point.active else deactivate_routes_with_point(db, point.id)
     db.commit()
 
-    return _redirect("point-activated" if point.active else "point-deactivated")
+    if point.active:
+        return _redirect("point-activated")
+
+    return _redirect("point-deactivated-routes" if routes_off else "point-deactivated")
 
 
 # ---------- Excluir (ADM-09) ----------
@@ -290,7 +300,7 @@ def delete_blockers(db: Session, point: MupiObject) -> list[str]:
 
     Ponto com histórico (visitas) ou ligado a insígnia não pode ser
     excluído: a insígnia e o histórico continuam com o usuário. O painel
-    oferece desativar. Rotas entram na Etapa 5.
+    oferece desativar.
     """
     reasons = []
 
@@ -310,6 +320,11 @@ def delete_blockers(db: Session, point: MupiObject) -> list[str]:
 
     if badge_names:
         reasons.append("Está ligado à insígnia: " + ", ".join(badge_names) + ".")
+
+    route_names = [route.name for route in routes_with_point(db, point.id)]
+
+    if route_names:
+        reasons.append("Faz parte da rota: " + ", ".join(route_names) + ".")
 
     return reasons
 

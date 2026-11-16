@@ -89,7 +89,7 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 
 ## Etapa 5 — Rotas (cerca de 2 semanas)
 
-1. [ ] **Backend:** cadastro, pontos ordenados e trajeto pelo OpenRouteService (ROT-01, 02, 03) + painel de rotas (ADM-07). O painel vem antes porque o app precisa de rotas cadastradas para ser testado.
+1. [x] **Backend:** cadastro, pontos ordenados e trajeto pelo OpenRouteService (ROT-01, 02, 03) + painel de rotas (ADM-07). O painel vem antes porque o app precisa de rotas cadastradas para ser testado. — 16/11, migração 0012. Trajeto calculado ao salvar (um pedido com todos os pontos) e guardado com a posição de cada ponto; falha salva a rota desativada com o erro e "Recalcular trajeto"; ativar exige capa, 2+ pontos ativos e trajeto; desativar um ponto desativa as rotas dele; ponto de rota não pode ser excluído. O aviso de progresso encerrado (ROT-10) e o bloqueio de exclusão por conclusões/insígnia entram nos passos 3 e 4
 2. [ ] **App:** modelos `RouteSummary`, `RouteDetail`; lista e detalhes com o mapa do trajeto (APP-ROT-01, 02)
 3. [ ] **Backend:** listar/ver (ROT-04), iniciar (ROT-05), rota ativa (ROT-06), finalizar ponto (ROT-07), encerrar (ROT-08), abandonar (ROT-09), rota alterada pelo administrador (ROT-10)
 4. [ ] **Backend:** insígnia de conclusão de rota (INS-04); tabela de eventos de rota iniciada/abandonada/concluída (observação do ADM-10)

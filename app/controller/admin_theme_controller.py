@@ -18,6 +18,7 @@ from app.core.templates import templates
 from app.database.database import get_db
 from app.model.badge import Badge
 from app.model.mupi_object_theme import MupiObjectTheme
+from app.model.route import RouteTheme
 from app.model.theme import Theme
 
 LIST_URL = "/admin/themes"
@@ -223,10 +224,23 @@ def _render_delete(
         .count()
     )
 
-    consequences = (
-        [f"{points} ponto(s) deixam de ter este tema. Os pontos continuam cadastrados."]
-        if points else []
+    routes = (
+        db.query(RouteTheme)
+        .filter(RouteTheme.theme_id == theme.id)
+        .count()
     )
+
+    consequences = []
+
+    if points:
+        consequences.append(
+            f"{points} ponto(s) deixam de ter este tema. Os pontos continuam cadastrados."
+        )
+
+    if routes:
+        consequences.append(
+            f"{routes} rota(s) deixam de ter este tema. As rotas continuam cadastradas."
+        )
 
     return templates.TemplateResponse(
         request=request,
@@ -259,8 +273,9 @@ def delete_theme(theme_id: int, request: Request, db: Session = Depends(get_db))
     if blockers:
         return _render_delete(request, db, theme, blockers, status_code=409)
 
-    # Remove só as ligações com os pontos; os pontos continuam (PT-03)
+    # Remove só as ligações com os pontos e as rotas; eles continuam (PT-03)
     db.query(MupiObjectTheme).filter(MupiObjectTheme.theme_id == theme.id).delete()
+    db.query(RouteTheme).filter(RouteTheme.theme_id == theme.id).delete()
     db.delete(theme)
 
     try:
