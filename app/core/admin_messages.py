@@ -14,6 +14,22 @@ MESSAGES = {
     "theme-created": "Tema cadastrado.",
     "theme-updated": "Tema atualizado.",
     "theme-deleted": "Tema excluído.",
+    "badge-created": "Insígnia cadastrada.",
+    "badge-updated": "Insígnia atualizada.",
+    "badge-activated": "Insígnia ativada: ela volta a ser concedida.",
+    "badge-deactivated": "Insígnia desativada: ela deixa de ser concedida. Quem já tem continua com ela.",
+    "badge-deleted": "Insígnia excluída.",
+    "route-created": "Rota cadastrada.",
+    "route-updated": "Rota atualizada.",
+    "route-saved-path-error": "Rota salva, mas o trajeto não pôde ser calculado. A rota fica desativada: veja o erro abaixo e recalcule o trajeto.",
+    "route-saved-inactive": "Rota salva, mas ainda não pode ser ativada: veja o que falta abaixo.",
+    "route-path-updated": "Trajeto recalculado.",
+    "route-path-error": "O trajeto não pôde ser calculado: veja o erro abaixo.",
+    "route-activated": "Rota ativada: ela aparece no app.",
+    "route-deactivated": "Rota desativada: ela não aparece mais no app.",
+    "route-deleted": "Rota excluída.",
+    "point-deactivated-routes": "Ponto desativado. As rotas que passam por ele também foram desativadas, até serem corrigidas.",
+    "point-updated-routes": "Ponto atualizado. Como ele foi desativado, as rotas que passam por ele também foram desativadas.",
 }
 
 

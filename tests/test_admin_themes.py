@@ -155,7 +155,7 @@ def test_tema_cadastrado_aparece_nos_outros_formularios(client):
     criar_tema(client, name="Arte Deco")
 
     assert "Arte Deco" in client.get("/admin/mupi-objects/new").text
-    assert "Arte Deco" in client.get("/admin/badges").text
+    assert "Arte Deco" in client.get("/admin/badges/new").text
 
 
 def test_mensagem_desconhecida_na_url_nao_aparece(client):

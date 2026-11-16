@@ -7,7 +7,6 @@ from app.model.admin import Admin  # noqa: F401
 from app.model.badge import Badge  # noqa: F401
 from app.model.email_code import EmailCode  # noqa: F401
 from app.model.mupi_object import MupiObject  # noqa: F401
-from app.model.mupi_object_badge import MupiObjectBadge  # noqa: F401
 from app.model.mupi_object_section import MupiObjectSection  # noqa: F401
 from app.model.mupi_object_theme import MupiObjectTheme  # noqa: F401
 from app.model.mupi_object_video import MupiObjectVideo  # noqa: F401
@@ -15,3 +14,4 @@ from app.model.theme import Theme  # noqa: F401
 from app.model.user import User  # noqa: F401
 from app.model.user_badge import UserBadge  # noqa: F401
 from app.model.user_visit import UserVisit  # noqa: F401
+from app.model.route import Route, RoutePoint, RouteTheme  # noqa: F401

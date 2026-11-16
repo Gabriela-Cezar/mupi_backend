@@ -16,7 +16,6 @@ from sqlalchemy.orm import Session
 from starlette.datastructures import FormData
 
 from app.core.youtube import extract_youtube_id
-from app.model.badge import Badge, BadgeRule
 from app.model.mupi_object import MupiObject
 from app.model.mupi_object_section import MupiObjectSection
 from app.model.mupi_object_video import MupiObjectVideo
@@ -50,7 +49,6 @@ class PointDraft:
     active: bool = True
     standalone: bool = True
     theme_ids: list[str] = field(default_factory=list)
-    badge_ids: list[str] = field(default_factory=list)
     sections: list[SimpleNamespace] = field(default_factory=list)
     videos: list[SimpleNamespace] = field(default_factory=list)
     address: str = ""
@@ -63,14 +61,10 @@ class PointDraft:
     audio_key: str | None = None
     audio_duration: int | None = None
 
-    # O template marca temas e insígnias por `.id`
+    # O template marca os temas por `.id`
     @property
     def themes(self):
         return [SimpleNamespace(id=_int_or_none(i)) for i in self.theme_ids]
-
-    @property
-    def badges(self):
-        return [SimpleNamespace(id=_int_or_none(i)) for i in self.badge_ids]
 
 
 def _int_or_none(value: str):
@@ -110,7 +104,6 @@ def read_point_form(form: FormData) -> PointDraft:
         # Marcado = o ponto só aparece dentro de rotas (PT-09)
         standalone=not _checked(form, "route_only"),
         theme_ids=_texts(form, "theme_ids"),
-        badge_ids=_texts(form, "badge_ids"),
         sections=[
             SimpleNamespace(title=t, body=b)
             for t, b in _pairs(_texts(form, "section_title"), _texts(form, "section_body"))
@@ -136,7 +129,6 @@ def draft_from_point(point: MupiObject) -> PointDraft:
         active=point.active,
         standalone=point.standalone,
         theme_ids=[str(t.id) for t in point.themes],
-        badge_ids=[str(b.id) for b in point.badges],
         sections=[SimpleNamespace(title=s.title, body=s.body) for s in point.sections],
         videos=[SimpleNamespace(url=v.url, title=v.title or "") for v in point.videos],
         address=point.address or "",
@@ -158,7 +150,6 @@ class PointData:
     active: bool
     standalone: bool
     themes: list[Theme]
-    badges: list[Badge]
     sections: list[tuple[str, str]]
     videos: list[tuple[str, str | None]]
     address: str | None
@@ -222,25 +213,6 @@ def load_themes(db: Session, theme_ids: list[str]) -> list[Theme]:
         raise FormError("Tema não encontrado.")
 
     return themes
-
-
-def load_point_badges(db: Session, badge_ids: list[str]) -> list[Badge]:
-    ids = _ids(badge_ids, "insígnia")
-
-    if not ids:
-        return []
-
-    badges = db.query(Badge).filter(Badge.id.in_(ids)).all()
-
-    if len(badges) != len(ids):
-        raise FormError("Uma ou mais insígnias informadas não existem.")
-
-    if any(badge.rule_type != BadgeRule.MANUAL for badge in badges):
-        raise FormError(
-            "Só insígnias do tipo 'visitar este ponto' podem ser ligadas a um ponto."
-        )
-
-    return badges
 
 
 def validate_sections(drafts: list[SimpleNamespace]) -> list[tuple[str, str]]:
@@ -324,7 +296,6 @@ def validate_point(db: Session, draft: PointDraft) -> PointData:
         active=draft.active,
         standalone=draft.standalone,
         themes=load_themes(db, draft.theme_ids),
-        badges=load_point_badges(db, draft.badge_ids),
         sections=validate_sections(draft.sections),
         videos=validate_videos(draft.videos),
         address=optional_text(draft.address, "Endereço", MAX_ADDRESS),
@@ -381,7 +352,6 @@ def apply_point(point: MupiObject, data: PointData) -> None:
     point.active = data.active
     point.standalone = data.standalone
     point.themes = data.themes
-    point.badges = data.badges
     point.address = data.address
     point.opening_hours = data.opening_hours
     point.accessibility = data.accessibility

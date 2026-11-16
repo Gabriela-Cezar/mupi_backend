@@ -422,7 +422,7 @@ def test_ponto_visitado_nao_pode_ser_excluido(client, db_session, ponto, s3_simu
 
 
 def test_ponto_ligado_a_insignia_nao_pode_ser_excluido(client, db_session, ponto):
-    ponto.badges.append(Badge(name="Visitou o Edifício", rule_type=BadgeRule.MANUAL))
+    ponto.badges.append(Badge(name="Visitou o Edifício", rule_type=BadgeRule.POINT_VISIT))
     db_session.commit()
 
     resposta = client.post(f"{URL}/{ponto.id}/delete", follow_redirects=False)

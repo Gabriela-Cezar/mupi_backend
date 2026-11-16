@@ -112,10 +112,11 @@ class MupiObject(Base):
         order_by="MupiObjectVideo.position"
     )
 
+    # Insígnias de visita deste ponto (INS-01); a ligação fica na insígnia
     badges = relationship(
         "Badge",
-        secondary="mupi_object_badges",
-        back_populates="objects"
+        back_populates="mupi_object",
+        order_by="Badge.name",
     )
 
     __table_args__ = (

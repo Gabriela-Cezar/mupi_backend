@@ -138,5 +138,6 @@ def serialize_content(obj: MupiObject) -> dict:
         "audio": serialize_audio(obj),
         "opening_hours": obj.opening_hours,
         "accessibility": obj.accessibility,
-        "badges": [serialize_badge(b) for b in obj.badges],
+        # Insígnias de visita deste ponto; as desativadas não aparecem
+        "badges": [serialize_badge(b) for b in obj.badges if b.active],
     }

@@ -16,7 +16,6 @@
 {% include "admin/_admin_header.html" %}
 
 {% set selected_themes = point.themes | map(attribute="id") | list %}
-{% set selected_badges = point.badges | map(attribute="id") | list %}
 
 <div class="container">
 
@@ -279,29 +278,26 @@
         <h2>Insígnias</h2>
 
         <p>
-            Insígnias do tipo "visitar este ponto". As insígnias de
-            contagem (N pontos) valem para todos os pontos e não aparecem aqui.
+            As insígnias de "visitar este ponto" são ligadas ao ponto no
+            cadastro da própria insígnia.
         </p>
 
-        {% if badges %}
-            <div class="badge-list">
-                {% for badge in badges %}
-                    <label class="badge-option">
-                        <input
-                            type="checkbox"
-                            name="badge_ids"
-                            value="{{ badge.id }}"
-                            {% if badge.id in selected_badges %}checked{% endif %}
-                        >
-                        <span>{{ badge.name }}</span>
-                    </label>
-                {% endfor %}
-            </div>
-        {% else %}
-            <p>Nenhuma insígnia do tipo "visitar este ponto" cadastrada.</p>
+        {% if editing %}
+            {% if badges %}
+                <ul>
+                    {% for badge in badges %}
+                        <li>
+                            {{ badge.name }}
+                            {% if not badge.active %}<span class="muted">(desativada)</span>{% endif %}
+                        </li>
+                    {% endfor %}
+                </ul>
+            {% else %}
+                <p class="muted">Nenhuma insígnia de visita ligada a este ponto.</p>
+            {% endif %}
         {% endif %}
 
-        <a href="/admin/badges">Cadastrar uma insígnia</a>
+        <p><a href="/admin/badges">Cadastrar uma insígnia</a></p>
 
 
         <button type="submit">

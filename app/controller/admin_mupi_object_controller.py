@@ -34,9 +34,8 @@ from app.core.admin_auth import require_admin_with_csrf
 from app.core.admin_messages import with_message
 from app.core.templates import templates
 from app.database.database import get_db
-from app.model.badge import Badge, BadgeRule
+from app.model.badge import Badge
 from app.model.mupi_object import MupiObject
-from app.model.mupi_object_badge import MupiObjectBadge
 from app.model.theme import Theme
 from app.model.user_visit import UserVisit
 from app.service import storage_service
@@ -99,12 +98,13 @@ def _render_form(
     error: str | None = None,
     status_code: int = 200,
 ):
-    # Só insígnias manuais são ligadas a um ponto; as de contagem valem para todos
+    # Insígnias de visita deste ponto (a ligação é feita na insígnia)
     badges = (
         db.query(Badge)
-        .filter(Badge.rule_type == BadgeRule.MANUAL)
+        .filter(Badge.object_id == point_id)
         .order_by(Badge.name)
         .all()
+        if point_id is not None else []
     )
 
     return templates.TemplateResponse(
@@ -304,8 +304,7 @@ def delete_blockers(db: Session, point: MupiObject) -> list[str]:
 
     badge_names = [
         name for (name,) in db.query(Badge.name)
-        .join(MupiObjectBadge, MupiObjectBadge.badge_id == Badge.id)
-        .filter(MupiObjectBadge.object_id == point.id)
+        .filter(Badge.object_id == point.id)
         .order_by(Badge.name)
     ]
 

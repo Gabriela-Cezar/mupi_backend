@@ -21,7 +21,6 @@ from app.model.mupi_object_theme import MupiObjectTheme
 from app.model.mupi_object_video import MupiObjectVideo
 from app.model.theme import Theme
 from app.model.mupi_object import MupiObject
-from app.model.mupi_object_badge import MupiObjectBadge
 from app.model.user import User
 from app.model.user_badge import UserBadge
 from app.model.user_visit import UserVisit
@@ -78,8 +77,12 @@ def criar_ponto(db, nome="Ponto"):
     return ponto
 
 
-def criar_insignia(db, nome="Insígnia"):
-    insignia = Badge(name=nome, rule_type=BadgeRule.MANUAL)
+def criar_insignia(db, nome="Insígnia", ponto=None):
+    """Insígnia de visita ao [ponto], ou de contagem se não houver ponto."""
+    if ponto is None:
+        insignia = Badge(name=nome, rule_type=BadgeRule.VISIT_COUNT, required_count=1)
+    else:
+        insignia = Badge(name=nome, rule_type=BadgeRule.POINT_VISIT, object_id=ponto.id)
     db.add(insignia)
     db.commit()
     return insignia
@@ -122,14 +125,12 @@ def test_ponto_visitado_pode_ser_desativado(db, usuario):
 
 def test_excluir_ponto_sem_visitas_funciona(db):
     ponto = criar_ponto(db)
-    insignia = criar_insignia(db)
     tema = Theme(name="Arte Deco")
     db.add(tema)
     db.flush()
     db.add(MupiObjectVideo(object_id=ponto.id, position=0, youtube_id="dQw4w9WgXcQ"))
     db.add(MupiObjectSection(object_id=ponto.id, position=0, title="História", body="Texto"))
     db.add(MupiObjectTheme(object_id=ponto.id, theme_id=tema.id))
-    db.add(MupiObjectBadge(object_id=ponto.id, badge_id=insignia.id))
     db.commit()
 
     excluir(db, ponto)
@@ -139,8 +140,20 @@ def test_excluir_ponto_sem_visitas_funciona(db):
     assert contar(db, MupiObjectSection) == 0    # e os blocos de texto
     assert contar(db, MupiObjectTheme) == 0      # só a ligação; o tema fica
     assert db.get(Theme, tema.id) is not None
-    assert contar(db, MupiObjectBadge) == 0      # só a ligação; a insígnia fica
-    assert db.get(Badge, insignia.id) is not None
+
+
+def test_excluir_ponto_com_insignia_e_recusado(db):
+    """A insígnia de visita é do ponto (INS-01): o ponto só pode ser
+    desativado (ADM-09)."""
+    ponto = criar_ponto(db)
+    insignia = criar_insignia(db, ponto=ponto)
+
+    with pytest.raises(IntegrityError):
+        excluir(db, ponto)
+    db.rollback()
+
+    assert db.get(MupiObject, ponto.id) is not None
+    assert db.get(Badge, insignia.id).object_id == ponto.id
 
 
 # ---------- Insígnias ----------
@@ -159,15 +172,13 @@ def test_excluir_insignia_conquistada_e_recusado(db, usuario):
 
 
 def test_excluir_insignia_nao_conquistada_funciona(db):
-    insignia = criar_insignia(db)
     ponto = criar_ponto(db)
-    db.add(MupiObjectBadge(object_id=ponto.id, badge_id=insignia.id))
-    db.commit()
+    insignia = criar_insignia(db, ponto=ponto)
 
     excluir(db, insignia)
 
     assert db.get(Badge, insignia.id) is None
-    assert contar(db, MupiObjectBadge) == 0
+    # O ponto continua
     assert db.get(MupiObject, ponto.id) is not None
 
 

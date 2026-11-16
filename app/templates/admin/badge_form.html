@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Cadastrar Insígnia</title>
+    <title>{% if editing %}Editar{% else %}Cadastrar{% endif %} insígnia</title>
     <link rel="stylesheet" href="/admin-static/style.css">
 </head>
 
@@ -13,18 +13,13 @@
 
 <div class="container">
 
-    <h1>Cadastrar Insígnia</h1>
+    <p><a href="/admin/badges">← Voltar para a lista</a></p>
 
-    <p>
-        Defina como a insígnia é conquistada. Insígnias do tipo
-        "visitar este ponto" são ligadas a um ponto no cadastro do MUPI.
-    </p>
+    <h1>{% if editing %}Editar insígnia{% else %}Cadastrar insígnia{% endif %}</h1>
 
-    <form
-        action="/admin/badges"
-        method="post"
-        enctype="multipart/form-data"
-    >
+    {% include "admin/_messages.html" %}
+
+    <form action="{{ form_action }}" method="post" enctype="multipart/form-data">
 
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
 
@@ -32,110 +27,134 @@
 
         <div class="form-group">
             <label for="name">Nome</label>
-            <input
-                type="text"
-                id="name"
-                name="name"
-                maxlength="100"
-                placeholder="Ex.: Explorador Arte Deco"
-                required
-            >
+            <input type="text" id="name" name="name" maxlength="100" required value="{{ badge.name }}">
         </div>
 
         <div class="form-group">
-            <label for="description">Descrição</label>
-            <textarea
-                id="description"
-                name="description"
-                rows="5"
-                placeholder="Ex.: Visite 5 pontos do tema Arte Deco"
-            ></textarea>
+            <label for="description">Descrição (aparece no perfil do usuário)</label>
+            <textarea id="description" name="description" rows="3">{{ badge.description }}</textarea>
         </div>
 
         <div class="form-group">
-            <label for="image">Imagem (PNG, JPEG ou WebP, até 5 MB)</label>
-            <input
-                type="file"
-                id="image"
-                name="image"
-                accept="image/png,image/jpeg,image/webp"
-            >
+            <label>
+                <input type="checkbox" name="active" value="true" {% if badge.active %}checked{% endif %}>
+                Insígnia ativa (pode ser conquistada)
+            </label>
         </div>
 
-        <h2>Regra de conquista</h2>
+
+        <h2>Imagem</h2>
 
         <div class="form-group">
-            <label for="rule_type">Como a insígnia é conquistada</label>
-            <select id="rule_type" name="rule_type" required>
-                {% for value, label in rules %}
-                    <option value="{{ value }}">{{ label }}</option>
-                {% endfor %}
-            </select>
-        </div>
+            {% if image_url %}
+                <img src="{{ image_url }}" alt="Imagem atual da insígnia" class="photo-preview">
+            {% endif %}
 
-        <div class="form-group" id="group-required-count" hidden>
-            <label for="required_count">Quantidade de pontos a visitar</label>
-            <input
-                type="number"
-                id="required_count"
-                name="required_count"
-                min="1"
-                step="1"
-                placeholder="Ex.: 5"
-            >
-        </div>
+            <label for="image">
+                {% if badge.image_key %}Substituir a imagem{% else %}Imagem{% endif %}
+                (PNG, JPEG ou WebP, até 5 MB)
+            </label>
+            <input type="file" id="image" name="image" accept="image/png,image/jpeg,image/webp">
 
-        <div class="form-group" id="group-theme" hidden>
-            <label for="theme_id">Tema</label>
+            {% if error and not editing %}
+                <p class="hint">Se você tinha escolhido uma imagem, escolha de novo.</p>
+            {% endif %}
 
-            {% if themes %}
-                <select id="theme_id" name="theme_id">
-                    <option value="">Selecione um tema</option>
-                    {% for theme in themes %}
-                        <option value="{{ theme.id }}">{{ theme.name }}</option>
-                    {% endfor %}
-                </select>
-            {% else %}
-                <p>
-                    Nenhum tema cadastrado. Cadastre um tema antes de criar
-                    uma insígnia por tema.
-                </p>
+            {% if badge.image_key %}
+                <label>
+                    <input type="checkbox" name="remove_image" value="true">
+                    Remover a imagem atual
+                </label>
             {% endif %}
         </div>
 
-        <button type="submit">Cadastrar Insígnia</button>
+
+        <h2>Como é conquistada</h2>
+
+        {% if rule_locked %}
+            <p class="hint">
+                {{ collected }} usuário(s) já conquistaram esta insígnia, então a regra não
+                pode mudar. Para outra regra, cadastre uma nova insígnia (e desative esta,
+                se for o caso).
+            </p>
+        {% endif %}
+
+        <fieldset class="rule-fields" {% if rule_locked %}disabled{% endif %}>
+
+            <div class="form-group">
+                <label for="rule_type">Tipo</label>
+                <select id="rule_type" name="rule_type" required>
+                    {% for value, label in rules %}
+                        <option value="{{ value }}" {% if value == badge.rule_type %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="group-point">
+                <label for="object_id">Ponto</label>
+                <select id="object_id" name="object_id">
+                    <option value="">Selecione o ponto</option>
+                    {% for point in points %}
+                        <option value="{{ point.id }}" {% if point.id | string == badge.object_id %}selected{% endif %}>
+                            {{ point.name }}{% if not point.active %} (desativado){% endif %}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="form-group" id="group-theme">
+                <label for="theme_id">Tema</label>
+                {% if themes %}
+                    <select id="theme_id" name="theme_id">
+                        <option value="">Selecione o tema</option>
+                        {% for theme in themes %}
+                            <option value="{{ theme.id }}" {% if theme.id | string == badge.theme_id %}selected{% endif %}>{{ theme.name }}</option>
+                        {% endfor %}
+                    </select>
+                {% else %}
+                    <p>Nenhum tema cadastrado. <a href="/admin/themes">Cadastrar um tema</a></p>
+                {% endif %}
+            </div>
+
+            <div class="form-group" id="group-count">
+                <label for="required_count">Quantidade de pontos a visitar</label>
+                <input type="number" id="required_count" name="required_count" min="1" max="1000" step="1"
+                       placeholder="Ex.: 5" value="{{ badge.required_count }}">
+            </div>
+
+        </fieldset>
+
+        <button type="submit">
+            {% if editing %}Salvar alterações{% else %}Cadastrar insígnia{% endif %}
+        </button>
 
     </form>
-
-    <br>
-
-    <a href="/admin/mupi-objects">Voltar para cadastro de MUPI</a>
 
 </div>
 
 <script>
-    // Mostra só os campos que a regra escolhida usa.
-    // O servidor valida tudo de novo; isto é só para facilitar o preenchimento.
+    // Mostra só os campos que o tipo escolhido usa (corrige FAL-03).
+    // O servidor valida tudo de novo; isto só facilita o preenchimento.
     (function () {
         const rule = document.getElementById("rule_type");
-        const countGroup = document.getElementById("group-required-count");
-        const themeGroup = document.getElementById("group-theme");
-        const count = document.getElementById("required_count");
-        const theme = document.getElementById("theme_id");
+        const groups = {
+            point: document.getElementById("group-point"),
+            theme: document.getElementById("group-theme"),
+            count: document.getElementById("group-count"),
+        };
+        const uses = {
+            point_visit: ["point"],
+            visit_count: ["count"],
+            theme_visit_count: ["theme", "count"],
+        };
 
         function update() {
-            const usesCount = rule.value !== "manual";
-            const usesTheme = rule.value === "theme_visit_count";
-
-            countGroup.hidden = !usesCount;
-            themeGroup.hidden = !usesTheme;
-
-            count.required = usesCount;
-            if (!usesCount) count.value = "";
-
-            if (theme) {
-                theme.required = usesTheme;
-                if (!usesTheme) theme.value = "";
+            const used = uses[rule.value] || [];
+            for (const [name, group] of Object.entries(groups)) {
+                const on = used.includes(name);
+                group.hidden = !on;
+                const field = group.querySelector("select, input");
+                if (field) field.required = on && !rule.disabled;
             }
         }
 

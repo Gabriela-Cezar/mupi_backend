@@ -44,20 +44,7 @@ def tema(db_session):
 
 
 @pytest.fixture
-def insignia_do_ponto(db_session):
-    insignia = Badge(
-        name="Visitou o Edifício",
-        description="Segredo até chegar",
-        rule_type=BadgeRule.MANUAL,
-        image_key=IMAGEM_INSIGNIA,
-    )
-    db_session.add(insignia)
-    db_session.commit()
-    return insignia
-
-
-@pytest.fixture
-def ponto(db_session, tema, insignia_do_ponto):
+def ponto(db_session, tema):
     ponto = MupiObject(
         name="Edifício Exemplo",
         latitude=LAT,
@@ -68,7 +55,13 @@ def ponto(db_session, tema, insignia_do_ponto):
         address="Rua 1, 100 - Centro",
         opening_hours="Seg a sex, 9h às 18h",
         accessibility="Rampa na entrada lateral",
-        badges=[insignia_do_ponto],
+        # Insígnia de visita deste ponto (INS-01)
+        badges=[Badge(
+            name="Visitou o Edifício",
+            description="Segredo até chegar",
+            rule_type=BadgeRule.POINT_VISIT,
+            image_key=IMAGEM_INSIGNIA,
+        )],
         sections=[
             MupiObjectSection(position=1, title="Arquitetura", body="Fachada Art Déco.\nDe 1937."),
             MupiObjectSection(position=0, title="História", body="Texto que só aparece perto do ponto."),
@@ -78,6 +71,11 @@ def ponto(db_session, tema, insignia_do_ponto):
     db_session.add(ponto)
     db_session.commit()
     return ponto
+
+
+@pytest.fixture
+def insignia_do_ponto(ponto):
+    return ponto.badges[0]
 
 
 @pytest.fixture
@@ -95,11 +93,21 @@ def ponto_inativo(db_session):
 
 
 @pytest.fixture
+def insignia_do_ponto(ponto):
+    return ponto.badges[0]
+
+
+@pytest.fixture
 def ponto_sem_midia(db_session):
     ponto = MupiObject(name="Praça Sem Mídia", latitude=LAT + 0.001, longitude=LNG, active=True)
     db_session.add(ponto)
     db_session.commit()
     return ponto
+
+
+@pytest.fixture
+def insignia_do_ponto(ponto):
+    return ponto.badges[0]
 
 
 def link_assinado(url, chave, validade=storage_service.IMAGE_URL_SECONDS):
@@ -281,6 +289,11 @@ def ponto_so_de_rota(db_session):
     return ponto
 
 
+@pytest.fixture
+def insignia_do_ponto(ponto):
+    return ponto.badges[0]
+
+
 def test_ponto_so_de_rota_fica_fora_do_mapa(user_client, ponto, ponto_so_de_rota):
     nomes = [p["name"] for p in user_client.get("/mupi-objects").json()]
 
@@ -385,8 +398,10 @@ def test_abrir_concede_insignia_de_contagem(user_client, db_session, usuario, po
 
     dados = abrir(user_client, ponto).json()
 
-    assert [b["name"] for b in dados["awarded"]] == ["Primeira visita"]
-    assert dados["awarded"][0]["collected_at_object"] == {
+    # A de contagem e a de visita do próprio ponto (INS-02, INS-03)
+    ganhas = {b["name"]: b for b in dados["awarded"]}
+    assert set(ganhas) == {"Primeira visita", "Visitou o Edifício"}
+    assert ganhas["Primeira visita"]["collected_at_object"] == {
         "id": ponto.id, "name": "Edifício Exemplo",
     }
     assert db_session.get(UserBadge, (usuario.id, contagem.id)) is not None
@@ -506,25 +521,13 @@ def test_rota_a_pe_para_ponto_inativo_retorna_404(user_client, ponto_inativo, mo
     assert resposta.status_code == 404
 
 
-# ---------- Rotas antigas do app continuam funcionando ----------
+# ---------- Rotas antigas removidas (INS-02) ----------
 
-def test_check_in_antigo_continua_funcionando(user_client, db_session, usuario, ponto):
-    perto = user_client.post("/users/me/visits", json={"object_id": ponto.id, **PERTO})
-    longe = user_client.post("/users/me/visits", json={"object_id": ponto.id, **LONGE})
+@pytest.mark.parametrize("rota", ["/users/me/visits", "/users/me/badges"])
+def test_check_in_e_coleta_manual_antigos_foram_removidos(user_client, ponto, rota):
+    resposta = user_client.post(rota, json={"object_id": ponto.id, "badge_id": 1, **PERTO})
 
-    assert perto.status_code == 200
-    assert perto.json()["new_visit"] is True
-    assert longe.status_code == 403
-
-
-def test_coleta_manual_antiga_continua_funcionando(user_client, ponto, insignia_do_ponto):
-    resposta = user_client.post(
-        "/users/me/badges",
-        json={"object_id": ponto.id, "badge_id": insignia_do_ponto.id, **PERTO},
-    )
-
-    assert resposta.status_code == 200
-    assert resposta.json()["badge"]["name"] == "Visitou o Edifício"
+    assert resposta.status_code in (404, 405)
 
 
 def test_perfil_continua_funcionando(user_client, ponto):

@@ -2,21 +2,11 @@ import logging
 
 import polyline
 import requests
-from fastapi import (
-    APIRouter,
-    Depends,
-    File,
-    Form,
-    HTTPException,
-    Query,
-    Request,
-    UploadFile,
-)
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from app.controller.admin_files import commit_or_delete_file, read_image, store_file
 from app.controller.serializers import (
     mupi_load_options,
     serialize_collected,
@@ -26,12 +16,8 @@ from app.controller.serializers import (
 from app.core.admin_auth import require_admin_with_csrf
 from app.core.config import OPENROUTESERVICE_API_KEY
 from app.core.dependencies import get_current_user
-from app.core.templates import templates
 from app.database.database import get_db
-from app.model.badge import Badge, BadgeRule
-from app.model.theme import Theme
 from app.model.mupi_object import MupiObject
-from app.model.mupi_object_badge import MupiObjectBadge  # noqa: F401  (registra a tabela de associação)
 from app.model.user import User
 from app.model.user_visit import UserVisit
 from app.service.badge_service import register_visit, visit_counts
@@ -61,20 +47,6 @@ mupi_object_api_router = APIRouter(
 
 
 
-def parse_optional_int(value: str | None, field: str) -> int | None:
-    value = (value or "").strip()
-
-    if not value:
-        return None
-
-    try:
-        return int(value)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Valor inválido para {field}."
-        )
-        
 # ---------- API do app: resumo (mapa, próximos, busca) ----------
 
 def visited_ids(db: Session, user_id: int) -> set[int]:
@@ -340,102 +312,3 @@ def admin_search_mupi_objects(
         }
         for obj in objects
     ]
-
-
-@router.get("/badges")
-def badge_form(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    themes = db.query(Theme).order_by(Theme.name).all()
-
-    return templates.TemplateResponse(
-        request=request,
-        name="admin/badge_form.html",
-        context={
-            "themes": themes,
-            "rules": [
-                (BadgeRule.MANUAL.value, "Visitar este ponto (ligada a um ponto MUPI)"),
-                (BadgeRule.VISIT_COUNT.value, "Visitar N pontos quaisquer"),
-                (BadgeRule.THEME_VISIT_COUNT.value, "Visitar N pontos de um tema"),
-            ],
-        }
-    )
-
-
-@router.post("/badges")
-def create_badge(
-    name: str = Form(..., max_length=100),
-    description: str = Form(None),
-    rule_type: str = Form("manual"),
-    required_count: str = Form(""),
-    theme_id: str = Form(""),
-    image: UploadFile = File(None),
-    db: Session = Depends(get_db)
-):
-    try:
-        rule = BadgeRule(rule_type)
-    except ValueError:
-        raise HTTPException(
-            status_code=400,
-            detail="Tipo de regra inválido."
-        )
-
-    count = parse_optional_int(required_count, "quantidade")
-    theme = parse_optional_int(theme_id, "tema")
-
-    if rule == BadgeRule.MANUAL:
-        count, theme = None, None
-    else:
-        if count is None or count < 1:
-            raise HTTPException(
-                status_code=400,
-                detail="Informe a quantidade de MUPIs a visitar (mínimo 1)."
-            )
-
-        if rule == BadgeRule.VISIT_COUNT:
-            theme = None
-        elif theme is None or db.get(Theme, theme) is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Selecione um tema válido para esta regra."
-            )
-
-    image_file = read_image(image) if image and image.filename else None
-
-    badge = Badge(
-        name=name,
-        description=description,
-        rule_type=rule,
-        required_count=count,
-        theme_id=theme
-    )
-
-    db.add(badge)
-
-    try:
-        # Gera o id da insígnia, usado no caminho da imagem no S3
-        db.flush()
-    except IntegrityError:
-        db.rollback()
-
-        raise HTTPException(
-            status_code=400,
-            detail="Já existe uma insígnia com esse nome."
-        )
-
-    if image_file is not None:
-        image_data, image_mime = image_file
-        badge.image_key = store_file(
-            db, f"badges/{badge.id}", "image", image_data, image_mime
-        )
-
-    commit_or_delete_file(db, badge.image_key)
-
-    db.refresh(badge)
-
-    return {
-        "message": "Insígnia cadastrada com sucesso!",
-        "id": badge.id
-    }
-    

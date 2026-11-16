@@ -1,10 +1,12 @@
 from enum import Enum
 
 from sqlalchemy import (
+    Boolean,
     CheckConstraint,
     Column,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -17,9 +19,15 @@ from app.database.database import Base
 
 
 class BadgeRule(str, Enum):
-    MANUAL = "manual"                        
-    VISIT_COUNT = "visit_count"              
-    THEME_VISIT_COUNT = "theme_visit_count" 
+    """Como a insígnia é conquistada (INS-01). A de conclusão de rota
+    (route_completion) entra com as rotas, na Etapa 5."""
+
+    # Visitar um ponto específico (object_id)
+    POINT_VISIT = "point_visit"
+    # Visitar N pontos quaisquer
+    VISIT_COUNT = "visit_count"
+    # Visitar N pontos de um tema (theme_id)
+    THEME_VISIT_COUNT = "theme_visit_count"
 
 
 class Badge(Base):
@@ -62,9 +70,7 @@ class Badge(Base):
             length=30,
             values_callable=lambda e: [m.value for m in e]
         ),
-        nullable=False,
-        default=BadgeRule.MANUAL,
-        server_default=BadgeRule.MANUAL.value
+        nullable=False
     )
 
     required_count = Column(Integer, nullable=True)
@@ -75,22 +81,36 @@ class Badge(Base):
         nullable=True
     )
 
-    objects = relationship(
-        "MupiObject",
-        secondary="mupi_object_badges",
-        back_populates="badges"
+    # Ponto da insígnia de visita (INS-01): exatamente um. RESTRICT: ponto
+    # com insígnia não pode ser excluído (ADM-09), só desativado.
+    object_id = Column(
+        Integer,
+        ForeignKey("mupi_objects.id", ondelete="RESTRICT"),
+        nullable=True
     )
+
+    # Desativada: deixa de ser concedida e some do perfil de quem não a
+    # tem; quem já conquistou continua com ela (INS-08, FAL-11)
+    active = Column(
+        Boolean,
+        default=True,
+        server_default="1",
+        nullable=False
+    )
+
+    mupi_object = relationship("MupiObject", back_populates="badges")
 
     theme = relationship("Theme")
 
     __table_args__ = (
         CheckConstraint(
-            "(rule_type = 'manual' AND required_count IS NULL "
-            "AND theme_id IS NULL) "
-            "OR (rule_type = 'visit_count' AND required_count >= 1 "
-            "AND theme_id IS NULL) "
-            "OR (rule_type = 'theme_visit_count' AND required_count >= 1 "
-            "AND theme_id IS NOT NULL)",
+            "(rule_type = 'point_visit' AND object_id IS NOT NULL "
+            "AND required_count IS NULL AND theme_id IS NULL) "
+            "OR (rule_type = 'visit_count' AND required_count IS NOT NULL "
+            "AND required_count >= 1 AND object_id IS NULL AND theme_id IS NULL) "
+            "OR (rule_type = 'theme_visit_count' AND required_count IS NOT NULL "
+            "AND required_count >= 1 AND theme_id IS NOT NULL AND object_id IS NULL)",
             name="ck_badges_rule_consistency"
         ),
+        Index("ix_badges_object_id", "object_id"),
     )

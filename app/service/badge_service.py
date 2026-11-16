@@ -45,14 +45,20 @@ def progress_of(badge: Badge, total: int, by_theme: dict[int, int]) -> int:
     return 0
 
 
-def award_visit_badges(
+def award_badges(
     db: Session,
     user_id: int,
-    object_id: int
+    object_id: int | None = None,
 ) -> list[UserBadge]:
-    """Concede as insígnias condicionais cujas condições foram cumpridas.
+    """Concede as insígnias ativas cujas condições o usuário já cumpre.
 
-    Não faz commit: quem chama decide quando confirmar.
+    - visita a ponto: o usuário já visitou o ponto da insígnia (INS-02),
+      mesmo que a visita seja anterior à insígnia;
+    - quantidade geral e por tema: pela contagem de visitas (INS-03, INS-05).
+
+    Chamada a cada visita nova ([object_id] = o ponto visitado agora) e ao
+    carregar o perfil, sem ponto, para a avaliação retroativa (INS-06).
+    Insígnias desativadas não são concedidas. Não faz commit.
     """
     collected_ids = (
         db.query(UserBadge.badge_id)
@@ -61,10 +67,8 @@ def award_visit_badges(
 
     pending = (
         db.query(Badge)
-        .filter(
-            Badge.rule_type != BadgeRule.MANUAL,
-            Badge.id.notin_(collected_ids)
-        )
+        .filter(Badge.active.is_(True), Badge.id.notin_(collected_ids))
+        .order_by(Badge.id)
         .all()
     )
 
@@ -73,18 +77,33 @@ def award_visit_badges(
 
     total, by_theme = visit_counts(db, user_id)
 
+    visited = {
+        visited_id for (visited_id,) in
+        db.query(UserVisit.object_id).filter(UserVisit.user_id == user_id)
+    }
+
     awarded = []
 
     for badge in pending:
-        if progress_of(badge, total, by_theme) >= badge.required_count:
-            item = UserBadge(
-                user_id=user_id,
-                badge_id=badge.id,
-                collected_at_object_id=object_id
-            )
+        if badge.rule_type == BadgeRule.POINT_VISIT:
+            if badge.object_id not in visited:
+                continue
+            # Conquistada no próprio ponto da insígnia
+            where = badge.object_id
+        elif progress_of(badge, total, by_theme) >= badge.required_count:
+            # Na visita que completou a contagem; na avaliação retroativa,
+            # não houve um ponto
+            where = object_id
+        else:
+            continue
 
-            db.add(item)
-            awarded.append(item)
+        item = UserBadge(
+            user_id=user_id,
+            badge_id=badge.id,
+            collected_at_object_id=where,
+        )
+        db.add(item)
+        awarded.append(item)
 
     if awarded:
         db.flush()
@@ -104,9 +123,12 @@ def register_visit(
 
     Guarda onde o usuário estava e a precisão do GPS (VIS-03). Devolve
     (visita_nova, insígnias_conquistadas). Não faz commit.
+
+    Reabrir um ponto já visitado também avalia as insígnias: uma insígnia
+    criada depois da visita é entregue na próxima abertura (INS-02, INS-06).
     """
     if db.get(UserVisit, (user_id, mupi.id)) is not None:
-        return False, []
+        return False, award_badges(db, user_id, mupi.id)
 
     db.add(UserVisit(
         user_id=user_id,
@@ -118,4 +140,4 @@ def register_visit(
 
     db.flush()
 
-    return True, award_visit_badges(db, user_id, mupi.id)
+    return True, award_badges(db, user_id, mupi.id)

@@ -11,6 +11,8 @@ from app.controller.user_controller import router as user_router
 from app.controller.admin_auth_controller import router as admin_auth_router
 from app.controller.admin_theme_controller import router as admin_theme_router
 from app.controller.admin_mupi_object_controller import router as admin_mupi_object_router
+from app.controller.admin_badge_controller import router as admin_badge_router
+from app.controller.admin_route_controller import router as admin_route_router
 from app.controller.local_files_controller import router as local_files_router
 from app.controller.app_settings_controller import router as app_settings_router
 from app.controller.mupi_object_controller import (
@@ -27,6 +29,8 @@ BASE_DIR = Path(__file__).resolve().parent
 app.include_router(admin_auth_router)
 app.include_router(admin_theme_router)
 app.include_router(admin_mupi_object_router)
+app.include_router(admin_badge_router)
+app.include_router(admin_route_router)
 
 app.mount(
     "/admin-static",

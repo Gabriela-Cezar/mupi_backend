@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Rotas</title>
+    <link rel="stylesheet" href="/admin-static/style.css">
+</head>
+
+<body>
+
+{% include "admin/_admin_header.html" %}
+
+<div class="container container-wide">
+
+    <div class="page-title">
+        <h1>Rotas</h1>
+        <a class="button-link" href="/admin/routes/new">Cadastrar rota</a>
+    </div>
+
+    {% include "admin/_messages.html" %}
+
+    {% if rows %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th scope="col">Nome</th>
+                    <th scope="col">Situação</th>
+                    <th scope="col">Pontos</th>
+                    <th scope="col">Distância</th>
+                    <th scope="col">Tempo</th>
+                    <th scope="col">Dificuldade</th>
+                    <th scope="col">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    {% set route = row.route %}
+                    <tr class="{% if not route.active %}row-inactive{% endif %}">
+                        <td><strong>{{ route.name }}</strong></td>
+                        <td>
+                            {% if route.active %}
+                                <span class="tag tag-ok">Ativa</span>
+                            {% else %}
+                                <span class="tag tag-off">Desativada</span>
+                            {% endif %}
+                            {% if not route.has_path %}
+                                <span class="tag tag-warn">Sem trajeto</span>
+                            {% endif %}
+                            {% if row.inactive_points %}
+                                <span class="tag tag-warn" title="{{ row.inactive_points | join(', ') }}">Ponto desativado</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ route.points | length }}</td>
+                        <td>{{ route.distance_m | km }}</td>
+                        <td>{% if route.minutes %}{{ route.minutes }} min{% else %}<span class="muted">—</span>{% endif %}</td>
+                        <td>{{ row.difficulty }}</td>
+                        <td class="actions">
+                            <a href="/admin/routes/{{ route.id }}/edit">Editar</a>
+
+                            <form action="/admin/routes/{{ route.id }}/status" method="post" class="inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="active" value="{{ 'false' if route.active else 'true' }}">
+                                <button type="submit" class="link-button">
+                                    {% if route.active %}Desativar{% else %}Ativar{% endif %}
+                                </button>
+                            </form>
+
+                            <a href="/admin/routes/{{ route.id }}/delete" class="danger-link">Excluir</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Nenhuma rota cadastrada ainda.</p>
+    {% endif %}
+
+</div>
+
+</body>
+
+</html>

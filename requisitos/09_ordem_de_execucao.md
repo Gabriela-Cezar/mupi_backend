@@ -66,26 +66,26 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 - [x] **Backend:** abertura recebe a precisão do GPS; distância máxima no `.env` com tolerância (VIS-01, VIS-02) — 16/11. `VISIT_MAX_DISTANCE_M` (padrão 25 m) e `VISIT_GPS_TOLERANCE_M` (padrão 15 m); `accuracy` opcional na abertura
 - [x] **Backend:** gravar latitude, longitude e precisão na visita (VIS-03); teste de concorrência (VIS-05) — 16/11, migração 0009
 - [x] **Backend:** devolver a distância máxima ao app (para o botão "Abrir" não repetir o valor) — 16/11, `GET /app-settings`
-- [ ] **App:** leitura em voz alta com `flutter_tts` (APP-PON-04)
-- [ ] **App:** áudio com `just_audio` (APP-PON-05)
-- [ ] **App:** YouTube dentro do app com `youtube_player_flutter` (APP-PON-06)
-- [ ] **App:** só uma mídia tocando por vez (APP-PON-04, 05, 06)
-- [ ] **App:** enviar a precisão do GPS e avisar "Sinal de GPS fraco" (APP-INF-05)
+- [x] **App:** leitura em voz alta com `flutter_tts` (APP-PON-04) — 16/11. "Ouvir tudo" e botão por bloco; pausar/continuar (retoma do começo do bloco)/parar; destaque no bloco lido; aviso de como instalar a voz pt-BR; para ao sair. A conferir num aparelho
+- [x] **App:** áudio com `just_audio` (APP-PON-05) — 16/11. Player na tela do ponto (entre o nome e os blocos): tocar/pausar, barra para avançar/voltar, duração antes de tocar; só carrega no primeiro toque, para ao sair; marca "Áudio" no cartão. A conferir num aparelho
+- [x] **App:** YouTube dentro do app com `youtube_player_flutter` (APP-PON-06) — 16/11, com o `youtube_player_iframe` (o `youtube_player_flutter` não funciona no navegador). Player numa janela suspensa sobre a tela do ponto (fechar para o vídeo), tela cheia opcional, "Este vídeo não está disponível" sem abrir o YouTube. A conferir num aparelho
+- [x] **App:** só uma mídia tocando por vez (APP-PON-04, 05, 06) — 16/11. Áudio, leitura e vídeo: começar um pausa o outro
+- [x] **App:** enviar a precisão do GPS e avisar "Sinal de GPS fraco" (APP-INF-05) — 16/11. O botão "Abrir" usa a regra de `GET /app-settings` (máxima + precisão até a tolerância), no lugar dos 50 m fixos; aviso com precisão pior que 50 m, sem bloquear
 - [ ] **Publicar em produção na AWS** ao fim desta etapa: Lightsail + banco gerenciado + S3, HTTPS, backups, README (INF-02, INF-05, INF-06); app apontando para HTTPS (APP-INF-02)
 - [ ] **Administradores começam a cadastrar o conteúdo real dos 40 pontos** em produção, em paralelo com as Etapas 4 a 6
 
 ## Etapa 4 — Insígnias, perfil e exclusão de conta
 
-- [ ] **Backend:** quatro tipos de insígnia, `object_id` no lugar de `mupi_object_badges`, `ativa` (INS-01); a insígnia de rota (`route_id`) entra na Etapa 5
-- [ ] **Backend:** concessão automática de visita e de quantidade, contagem que não diminui, avaliação retroativa, registro e retorno imediato (INS-02, 03, 05, 06, 07, 09)
-- [ ] **Backend:** remover `POST /users/me/visits` e `POST /users/me/badges`
-- [ ] **Backend:** painel de insígnias com bloqueio de exclusão (ADM-06, ADM-08, ADM-09)
-- [ ] **Backend:** histórico de visitas `GET /users/me/visits` (VIS-04); perfil completo (USR-07, INS-08)
-- [ ] **Backend:** exclusão de conta `DELETE /users/me` com senha, chamando `revoke_sessions` (USR-08, USR-05)
-- [ ] **App:** perfil, insígnias conquistadas, em progresso e bloqueadas (APP-PER-01, 02, 03, 06)
-- [ ] **App:** aviso de conquista (APP-PER-04)
-- [ ] **App:** histórico de pontos visitados (APP-PER-05)
-- [ ] **App:** "Sair" no perfil e "Excluir minha conta" com senha (APP-AUT-06, APP-AUT-08)
+- [x] **Backend:** quatro tipos de insígnia, `object_id` no lugar de `mupi_object_badges`, `ativa` (INS-01); a insígnia de rota (`route_id`) entra na Etapa 5 — 16/11, migração 0011 (`manual` → `point_visit`)
+- [x] **Backend:** concessão automática de visita e de quantidade, contagem que não diminui, avaliação retroativa, registro e retorno imediato (INS-02, 03, 05, 06, 07, 09) — 16/11; avalia a cada abertura (inclusive reabertura) e ao carregar o perfil
+- [x] **Backend:** remover `POST /users/me/visits` e `POST /users/me/badges` — 16/11
+- [x] **Backend:** painel de insígnias com bloqueio de exclusão (ADM-06, ADM-08, ADM-09) — 16/11. Lista (tipo, condição, situação, conquistas), formulário por tipo, imagem, ativar/desativar; insígnia conquistada não muda de regra nem pode ser excluída
+- [x] **Backend:** histórico de visitas `GET /users/me/visits` (VIS-04); perfil completo (USR-07, INS-08) — 16/11. Histórico com pontos desativados marcados como indisponíveis; perfil com `locked` (insígnias de ponto não ganhas, só id e tipo) e `active_route` (nulo até a Etapa 5)
+- [x] **Backend:** exclusão de conta `DELETE /users/me` com senha, chamando `revoke_sessions` (USR-08, USR-05) — 16/11. Senha errada = 403 (não 401); 5 tentativas a cada 15 min por conta; contas Google confirmarão com `id_token` quando esse login existir
+- [x] **App:** perfil, insígnias conquistadas, em progresso e bloqueadas (APP-PER-01, 02, 03, 06) — 16/11. Pelo botão de perfil do menu do mapa; recarrega ao abrir e ao puxar a tela
+- [x] **App:** aviso de conquista (APP-PER-04) — 16/11. Janela com imagem e nome (todas num único aviso), animação e vibração curta
+- [x] **App:** histórico de pontos visitados (APP-PER-05) — 16/11, no perfil; tocar num ponto disponível mostra o cartão dele no mapa
+- [x] **App:** "Sair" no perfil e "Excluir minha conta" com senha (APP-AUT-06, APP-AUT-08) — 16/11. O "Sair" saiu da barra do mapa
 
 ## Etapa 5 — Rotas (cerca de 2 semanas)
 

@@ -33,3 +33,15 @@ def format_duration(seconds: int | None) -> str:
 
 
 templates.env.filters["duration"] = format_duration
+
+
+def format_km(meters: float | None) -> str:
+    """Distância para o painel (ex.: 850 → "850 m"; 2340 → "2,3 km")."""
+    if meters is None:
+        return "—"
+    if meters < 1000:
+        return f"{round(meters)} m"
+    return f"{meters / 1000:.1f} km".replace(".", ",")
+
+
+templates.env.filters["km"] = format_km

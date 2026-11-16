@@ -28,9 +28,9 @@ from tests.conftest import (
 HTML = {"accept": "text/html,application/xhtml+xml"}
 
 # Páginas com um formulário de envio (além do botão "Sair")
-PAGINAS_COM_FORMULARIO = ["/admin/mupi-objects/new", "/admin/badges", "/admin/themes"]
+PAGINAS_COM_FORMULARIO = ["/admin/mupi-objects/new", "/admin/badges/new", "/admin/themes"]
 
-PAGINAS = ["/admin/mupi-objects"] + PAGINAS_COM_FORMULARIO
+PAGINAS = ["/admin/mupi-objects", "/admin/badges"] + PAGINAS_COM_FORMULARIO
 
 ROTAS_JSON = ["/admin/search?name=a"]
 
@@ -376,10 +376,16 @@ def test_token_csrf_no_formulario_funciona(logado_sem_csrf, db_session):
 def test_token_csrf_no_formulario_com_arquivo_funciona(logado_sem_csrf, db_session):
     resposta = logado_sem_csrf.post(
         "/admin/badges",
-        data={"name": "Explorador", "csrf_token": csrf_da_sessao(logado_sem_csrf)},
+        data={
+            "name": "Explorador",
+            "rule_type": "visit_count",
+            "required_count": "1",
+            "csrf_token": csrf_da_sessao(logado_sem_csrf),
+        },
         files={"image": ("", b"", "application/octet-stream")},
     )
 
+    # Salvo: volta para a lista de insígnias
     assert resposta.status_code == 200
     assert db_session.query(Badge).count() == 1
 

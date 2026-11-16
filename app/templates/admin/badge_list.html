@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Insígnias</title>
+    <link rel="stylesheet" href="/admin-static/style.css">
+</head>
+
+<body>
+
+{% include "admin/_admin_header.html" %}
+
+<div class="container container-wide">
+
+    <div class="page-title">
+        <h1>Insígnias</h1>
+        <a class="button-link" href="/admin/badges/new">Cadastrar insígnia</a>
+    </div>
+
+    {% include "admin/_messages.html" %}
+
+    {% if rows %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th scope="col">Imagem</th>
+                    <th scope="col">Nome</th>
+                    <th scope="col">Tipo</th>
+                    <th scope="col">Condição</th>
+                    <th scope="col">Situação</th>
+                    <th scope="col">Conquistas</th>
+                    <th scope="col">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in rows %}
+                    {% set badge = row.badge %}
+                    <tr class="{% if not badge.active %}row-inactive{% endif %}">
+                        <td>
+                            {% if row.image_url %}
+                                <img src="{{ row.image_url }}" alt="" class="badge-thumb">
+                            {% else %}
+                                <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td><strong>{{ badge.name }}</strong></td>
+                        <td>{{ row.type }}</td>
+                        <td>{{ row.condition }}</td>
+                        <td>
+                            {% if badge.active %}
+                                <span class="tag tag-ok">Ativa</span>
+                            {% else %}
+                                <span class="tag tag-off">Desativada</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ row.collected }}</td>
+                        <td class="actions">
+                            <a href="/admin/badges/{{ badge.id }}/edit">Editar</a>
+
+                            <form action="/admin/badges/{{ badge.id }}/status" method="post" class="inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="active" value="{{ 'false' if badge.active else 'true' }}">
+                                <button type="submit" class="link-button">
+                                    {% if badge.active %}Desativar{% else %}Ativar{% endif %}
+                                </button>
+                            </form>
+
+                            <a href="/admin/badges/{{ badge.id }}/delete" class="danger-link">Excluir</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Nenhuma insígnia cadastrada ainda.</p>
+    {% endif %}
+
+</div>
+
+</body>
+
+</html>

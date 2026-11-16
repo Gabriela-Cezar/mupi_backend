@@ -109,11 +109,6 @@ def store_file(
         )
 
 
-def commit_or_delete_file(db: Session, key: str | None) -> None:
-    """Grava no banco; se falhar, apaga o arquivo recém-enviado ao S3."""
-    commit_or_delete_files(db, [key])
-
-
 def commit_or_delete_files(db: Session, keys: list[str | None]) -> None:
     """Grava no banco; se falhar, apaga os arquivos recém-enviados ao S3."""
     try:

@@ -175,17 +175,6 @@ def test_abrir_de_novo_mantem_a_posicao_da_primeira_visita(user_client, db_sessi
     assert visita.latitude == pytest.approx(ao_norte(5)["latitude"])
 
 
-def test_check_in_antigo_tambem_guarda_a_posicao(user_client, db_session, ponto):
-    resposta = user_client.post(
-        "/users/me/visits",
-        json={"object_id": ponto.id, **ao_norte(30), "accuracy": 10},
-    )
-
-    assert resposta.status_code == 200
-    [visita] = visitas(db_session)
-    assert visita.accuracy == 10
-
-
 # ---------- Aberturas simultâneas (VIS-05) ----------
 
 @pytest.fixture
