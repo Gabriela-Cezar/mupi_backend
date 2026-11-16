@@ -38,6 +38,7 @@ from app.core.templates import templates
 from app.database.database import get_db
 from app.model.badge import Badge
 from app.model.mupi_object import MupiObject
+from app.model.route import Route
 from app.model.theme import Theme
 from app.model.user_badge import UserBadge
 from app.service import storage_service
@@ -78,7 +79,11 @@ def _collected_count(db: Session, badge_id: int) -> int:
 def list_badges(request: Request, db: Session = Depends(get_db)):
     badges = (
         db.query(Badge)
-        .options(selectinload(Badge.mupi_object), selectinload(Badge.theme))
+        .options(
+            selectinload(Badge.mupi_object),
+            selectinload(Badge.theme),
+            selectinload(Badge.route),
+        )
         .order_by(Badge.name)
         .all()
     )
@@ -132,6 +137,7 @@ def _render_form(
             "rules": [(rule.value, label) for rule, label in RULE_LABELS.items()],
             "points": db.query(MupiObject).order_by(MupiObject.name).all(),
             "themes": db.query(Theme).order_by(Theme.name).all(),
+            "routes": db.query(Route).order_by(Route.name).all(),
             "error": error,
         },
         status_code=status_code,
@@ -219,6 +225,7 @@ async def update_badge(badge_id: int, request: Request, db: Session = Depends(ge
         saved = draft_from_badge(badge)
         draft.rule_type, draft.object_id = saved.rule_type, saved.object_id
         draft.theme_id, draft.required_count = saved.theme_id, saved.required_count
+        draft.route_id = saved.route_id
 
     def error(message: str, status_code: int):
         return _render_form(

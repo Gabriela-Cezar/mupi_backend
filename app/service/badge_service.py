@@ -5,6 +5,7 @@ from app.model.badge import Badge, BadgeRule
 from app.model.mupi_object import MupiObject
 from app.model.mupi_object_theme import MupiObjectTheme
 from app.model.user_badge import UserBadge
+from app.model.user_route_completion import UserRouteCompletion
 from app.model.user_visit import UserVisit
 
 
@@ -54,7 +55,9 @@ def award_badges(
 
     - visita a ponto: o usuário já visitou o ponto da insígnia (INS-02),
       mesmo que a visita seja anterior à insígnia;
-    - quantidade geral e por tema: pela contagem de visitas (INS-03, INS-05).
+    - quantidade geral e por tema: pela contagem de visitas (INS-03, INS-05);
+    - conclusão de rota: o usuário já concluiu a rota (INS-04), mesmo antes
+      de a insígnia existir. Uma vez só, mesmo refazendo a rota.
 
     Chamada a cada visita nova ([object_id] = o ponto visitado agora) e ao
     carregar o perfil, sem ponto, para a avaliação retroativa (INS-06).
@@ -82,10 +85,24 @@ def award_badges(
         db.query(UserVisit.object_id).filter(UserVisit.user_id == user_id)
     }
 
+    completed_routes = {
+        route_id for (route_id,) in
+        db.query(UserRouteCompletion.route_id)
+        .filter(UserRouteCompletion.user_id == user_id)
+        .distinct()
+    }
+
     awarded = []
 
     for badge in pending:
-        if badge.rule_type == BadgeRule.POINT_VISIT:
+        route_id = None
+
+        if badge.rule_type == BadgeRule.ROUTE_COMPLETION:
+            if badge.route_id not in completed_routes:
+                continue
+            # Conquistada na rota; não houve um ponto
+            route_id, where = badge.route_id, None
+        elif badge.rule_type == BadgeRule.POINT_VISIT:
             if badge.object_id not in visited:
                 continue
             # Conquistada no próprio ponto da insígnia
@@ -101,6 +118,7 @@ def award_badges(
             user_id=user_id,
             badge_id=badge.id,
             collected_at_object_id=where,
+            collected_at_route_id=route_id,
         )
         db.add(item)
         awarded.append(item)

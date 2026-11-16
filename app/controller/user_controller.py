@@ -4,6 +4,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
+from app.controller.active_route_controller import active_route_or_none
 from app.controller.serializers import serialize_badge_full, serialize_collected
 from app.core.dependencies import get_current_user
 from app.core.rate_limit import RateLimiter, format_wait, too_many_requests
@@ -54,6 +55,7 @@ def get_profile(
         .options(
             selectinload(UserBadge.badge).selectinload(Badge.theme),
             selectinload(UserBadge.mupi_object),
+            selectinload(UserBadge.route),
         )
         .filter(UserBadge.user_id == user_id)
         .order_by(UserBadge.collected_at.desc())
@@ -85,16 +87,16 @@ def get_profile(
             ),
         }
         for badge in not_collected
-        if badge.rule_type != BadgeRule.POINT_VISIT
+        if badge.rule_type in (BadgeRule.VISIT_COUNT, BadgeRule.THEME_VISIT_COUNT)
     ]
 
-    # Bloqueadas: as de visita a ponto ainda não ganhas. Vão sem nome,
-    # descrição nem imagem, para não revelar o ponto: o app mostra uma
-    # silhueta (INS-08)
+    # Bloqueadas: as de visita a ponto e de conclusão de rota ainda não
+    # ganhas. Vão sem nome, descrição nem imagem, para não revelar o ponto
+    # ou a rota: o app mostra uma silhueta (INS-08)
     locked = [
         {"id": badge.id, "type": badge.rule_type.value}
         for badge in not_collected
-        if badge.rule_type == BadgeRule.POINT_VISIT
+        if badge.rule_type in (BadgeRule.POINT_VISIT, BadgeRule.ROUTE_COMPLETION)
     ]
 
     # Total possível: as ativas, mais as desativadas que ele já tem
@@ -117,8 +119,8 @@ def get_profile(
         "badges": [serialize_collected(item) for item in collected],
         "in_progress": in_progress,
         "locked": locked,
-        # Rota que o usuário está fazendo (Etapa 5, ROT-04)
-        "active_route": None,
+        # Rota que o usuário está fazendo (USR-07, ROT-06)
+        "active_route": active_route_or_none(db, user_id),
     }
 
 

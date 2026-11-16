@@ -14,6 +14,10 @@ from app.controller.admin_mupi_object_controller import router as admin_mupi_obj
 from app.controller.admin_badge_controller import router as admin_badge_router
 from app.controller.admin_route_controller import router as admin_route_router
 from app.controller.route_controller import router as route_router
+from app.controller.active_route_controller import (
+    router as active_route_router,
+    start_router as route_start_router,
+)
 from app.controller.local_files_controller import router as local_files_router
 from app.controller.app_settings_controller import router as app_settings_router
 from app.controller.mupi_object_controller import (
@@ -54,5 +58,7 @@ app.include_router(mupi_object_router)
 app.include_router(mupi_object_api_router)
 app.include_router(app_settings_router)
 app.include_router(route_router)
+app.include_router(route_start_router)
+app.include_router(active_route_router)
 # Arquivos da pasta local (LOCAL_STORAGE_DIR, só desenvolvimento)
 app.include_router(local_files_router)

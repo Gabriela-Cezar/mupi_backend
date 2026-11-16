@@ -38,11 +38,14 @@ from app.core.admin_auth import require_admin_with_csrf
 from app.core.admin_messages import with_message
 from app.core.templates import templates
 from app.database.database import get_db
+from app.model.badge import Badge
 from app.model.mupi_object import MupiObject
 from app.model.route import Route, RoutePoint
 from app.model.theme import Theme
 from app.model.user_route_completion import UserRouteCompletion
 from app.service import storage_service
+from app.model.user_active_route import CancelReason
+from app.service.active_route_service import cancel_progress, users_doing
 from app.service.route_path_service import update_route_path
 
 LIST_URL = "/admin/routes"
@@ -147,6 +150,8 @@ def _render_form(
             "difficulties": [(d.value, label) for d, label in DIFFICULTY_LABELS.items()],
             "age_ratings": [(a.value, label) for a, label in AGE_RATING_LABELS.items()],
             "problems": activation_problems(route) if route is not None else [],
+            # Aviso: mudar os pontos ou desativar encerra o progresso (ADM-07)
+            "users_doing": users_doing(db, route.id) if route is not None else 0,
             "error": error,
         },
         status_code=status_code,
@@ -176,7 +181,11 @@ def _save(
 
     Devolve (arquivos enviados, código da mensagem). Erros de envio da capa
     sobem como HTTPException.
+
+    Mudar os pontos/a ordem ou desativar encerra o progresso de quem está
+    fazendo a rota (ROT-10). Nome, descrição e capa não afetam o progresso.
     """
+    was_active = route.active
     points_changed = apply_route(db, route, data)
     db.flush()
 
@@ -195,6 +204,11 @@ def _save(
     # Ativar só se nada faltar; senão a rota fica desativada (ROT-01, ROT-03)
     problems = activation_problems(route)
     route.active = data.active and not problems
+
+    if route.id is not None and points_changed:
+        cancel_progress(db, route.id, CancelReason.ROUTE_UPDATED)
+    elif was_active and not route.active:
+        cancel_progress(db, route.id, CancelReason.ROUTE_DEACTIVATED)
 
     if not path_ok:
         return sent, "route-saved-path-error"
@@ -296,7 +310,13 @@ async def update_route(route_id: int, request: Request, db: Session = Depends(ge
 def recalculate_path(route_id: int, db: Session = Depends(get_db)):
     route = _get_route(db, route_id)
 
+    was_active = route.active
     ok = update_route_path(route)
+
+    # Sem trajeto, a rota é desativada: encerra o progresso (ROT-10)
+    if was_active and not route.active:
+        cancel_progress(db, route.id, CancelReason.ROUTE_DEACTIVATED)
+
     db.commit()
 
     return _redirect(
@@ -324,6 +344,11 @@ async def set_route_status(route_id: int, request: Request, db: Session = Depend
             )
 
     route.active = activate
+
+    # Desativar encerra o progresso de quem está fazendo a rota (ROT-10)
+    if not activate:
+        cancel_progress(db, route.id, CancelReason.ROUTE_DEACTIVATED)
+
     db.commit()
 
     return _redirect("route-activated" if activate else "route-deactivated")
@@ -332,9 +357,11 @@ async def set_route_status(route_id: int, request: Request, db: Session = Depend
 # ---------- Excluir (ADM-09) ----------
 
 def delete_blockers(db: Session, route: Route) -> list[str]:
-    """Rota concluída por alguém não pode ser excluída: a conclusão fica no
-    histórico do usuário (ADM-09). O painel oferece desativar. A insígnia de
-    rota entra no passo 4 da Etapa 5. Vazio = pode excluir."""
+    """Rota concluída por alguém ou com insígnia de conclusão não pode ser
+    excluída: a conclusão e a insígnia ficam com o usuário (ADM-09). O
+    painel oferece desativar. Vazio = pode excluir."""
+    reasons = []
+
     users = (
         db.query(func.count(distinct(UserRouteCompletion.user_id)))
         .filter(UserRouteCompletion.route_id == route.id)
@@ -342,12 +369,16 @@ def delete_blockers(db: Session, route: Route) -> list[str]:
     ) or 0
 
     if users == 1:
-        return ["1 usuário já concluiu esta rota."]
+        reasons.append("1 usuário já concluiu esta rota.")
+    elif users:
+        reasons.append(f"{users} usuários já concluíram esta rota.")
 
-    if users:
-        return [f"{users} usuários já concluíram esta rota."]
+    badge = db.query(Badge.name).filter(Badge.route_id == route.id).first()
 
-    return []
+    if badge is not None:
+        reasons.append(f"Tem a insígnia de conclusão: {badge[0]}.")
+
+    return reasons
 
 
 def _render_delete(request: Request, route: Route, blockers: list[str], status_code: int = 200):

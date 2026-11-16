@@ -16,3 +16,5 @@ from app.model.user_badge import UserBadge  # noqa: F401
 from app.model.user_visit import UserVisit  # noqa: F401
 from app.model.route import Route, RoutePoint, RouteTheme  # noqa: F401
 from app.model.user_route_completion import UserRouteCompletion  # noqa: F401
+from app.model.user_active_route import UserActiveRoute  # noqa: F401
+from app.model.route_event import RouteEvent  # noqa: F401

@@ -25,6 +25,15 @@
 
     {% include "admin/_messages.html" %}
 
+    {% if editing and users_doing %}
+        <div class="problems">
+            <strong>{{ users_doing }} usuário(s) estão fazendo esta rota agora.</strong>
+            Mudar os pontos, a ordem ou desativar a rota encerra o progresso deles
+            (o app pede para iniciarem de novo). Nome, descrição e capa podem mudar
+            sem afetar ninguém.
+        </div>
+    {% endif %}
+
     {% if editing and problems %}
         <div class="problems">
             <strong>Para ativar a rota, falta:</strong>

@@ -6,8 +6,8 @@
 3. apply_badge: grava os valores na insígnia.
 
 O formulário muda conforme o tipo (corrige FAL-03): visita a ponto pede o
-ponto; quantidade geral, o N; quantidade por tema, o tema e o N. A
-conclusão de rota entra com as rotas (Etapa 5).
+ponto; quantidade geral, o N; quantidade por tema, o tema e o N; conclusão
+de rota, a rota (uma insígnia de conclusão por rota).
 """
 from dataclasses import dataclass
 
@@ -18,6 +18,7 @@ from starlette.datastructures import FormData
 from app.controller.mupi_object_form import FormError
 from app.model.badge import Badge, BadgeRule
 from app.model.mupi_object import MupiObject
+from app.model.route import Route
 from app.model.theme import Theme
 
 MAX_NAME = 100
@@ -28,6 +29,7 @@ RULE_LABELS = {
     BadgeRule.POINT_VISIT: "Visita a ponto",
     BadgeRule.VISIT_COUNT: "Quantidade geral",
     BadgeRule.THEME_VISIT_COUNT: "Quantidade por tema",
+    BadgeRule.ROUTE_COMPLETION: "Conclusão de rota",
 }
 
 
@@ -36,6 +38,10 @@ def condition_of(badge: Badge) -> str:
     if badge.rule_type == BadgeRule.POINT_VISIT:
         name = badge.mupi_object.name if badge.mupi_object else "?"
         return f"Visitar {name}"
+
+    if badge.rule_type == BadgeRule.ROUTE_COMPLETION:
+        name = badge.route.name if badge.route else "?"
+        return f"Concluir a rota {name}"
 
     count = badge.required_count
     points = "1 ponto" if count == 1 else f"{count} pontos"
@@ -56,6 +62,7 @@ class BadgeDraft:
     description: str = ""
     rule_type: str = BadgeRule.POINT_VISIT.value
     object_id: str = ""
+    route_id: str = ""
     theme_id: str = ""
     required_count: str = ""
     active: bool = True
@@ -75,6 +82,7 @@ def read_badge_form(form: FormData) -> BadgeDraft:
         description=_text(form, "description"),
         rule_type=_text(form, "rule_type"),
         object_id=_text(form, "object_id"),
+        route_id=_text(form, "route_id"),
         theme_id=_text(form, "theme_id"),
         required_count=_text(form, "required_count"),
         active=_text(form, "active").lower() in ("true", "on", "1"),
@@ -89,6 +97,7 @@ def draft_from_badge(badge: Badge) -> BadgeDraft:
         description=badge.description or "",
         rule_type=badge.rule_type.value,
         object_id=str(badge.object_id or ""),
+        route_id=str(badge.route_id or ""),
         theme_id=str(badge.theme_id or ""),
         required_count=str(badge.required_count or ""),
         active=badge.active,
@@ -107,6 +116,7 @@ class BadgeData:
     theme_id: int | None
     required_count: int | None
     active: bool
+    route_id: int | None = None
 
 
 def _int(value: str) -> int | None:
@@ -116,12 +126,36 @@ def _int(value: str) -> int | None:
         return None
 
 
-def _rule(db: Session, draft: BadgeDraft):
-    """(tipo, ponto, tema, quantidade) conferidos."""
+def _route_rule(db: Session, draft: BadgeDraft, badge: Badge | None) -> int:
+    route_id = _int(draft.route_id)
+
+    if route_id is None:
+        raise FormError("Selecione a rota da insígnia.")
+
+    if db.get(Route, route_id) is None:
+        raise FormError("Rota não encontrada.")
+
+    # Uma rota tem no máximo uma insígnia de conclusão (INS-04)
+    other = db.query(Badge).filter(Badge.route_id == route_id)
+    if badge is not None:
+        other = other.filter(Badge.id != badge.id)
+    other = other.first()
+
+    if other is not None:
+        raise FormError(f"Esta rota já tem uma insígnia de conclusão: {other.name}.")
+
+    return route_id
+
+
+def _rule(db: Session, draft: BadgeDraft, badge: Badge | None = None):
+    """(tipo, ponto, tema, quantidade, rota) conferidos."""
     try:
         rule = BadgeRule(draft.rule_type)
     except ValueError:
         raise FormError("Escolha como a insígnia é conquistada.")
+
+    if rule == BadgeRule.ROUTE_COMPLETION:
+        return rule, None, None, None, _route_rule(db, draft, badge)
 
     if rule == BadgeRule.POINT_VISIT:
         point_id = _int(draft.object_id)
@@ -132,7 +166,7 @@ def _rule(db: Session, draft: BadgeDraft):
         if db.get(MupiObject, point_id) is None:
             raise FormError("Ponto não encontrado.")
 
-        return rule, point_id, None, None
+        return rule, point_id, None, None, None
 
     count = _int(draft.required_count)
 
@@ -143,7 +177,7 @@ def _rule(db: Session, draft: BadgeDraft):
         raise FormError(f"Quantidade: no máximo {MAX_COUNT}.")
 
     if rule == BadgeRule.VISIT_COUNT:
-        return rule, None, None, count
+        return rule, None, None, count, None
 
     theme_id = _int(draft.theme_id)
 
@@ -153,7 +187,7 @@ def _rule(db: Session, draft: BadgeDraft):
     if db.get(Theme, theme_id) is None:
         raise FormError("Tema não encontrado.")
 
-    return rule, None, theme_id, count
+    return rule, None, theme_id, count, None
 
 
 def validate_badge(
@@ -186,8 +220,9 @@ def validate_badge(
     if rule_locked and badge is not None:
         rule = badge.rule_type
         object_id, theme_id, count = badge.object_id, badge.theme_id, badge.required_count
+        route_id = badge.route_id
     else:
-        rule, object_id, theme_id, count = _rule(db, draft)
+        rule, object_id, theme_id, count, route_id = _rule(db, draft, badge)
 
     return BadgeData(
         name=name,
@@ -197,6 +232,7 @@ def validate_badge(
         theme_id=theme_id,
         required_count=count,
         active=draft.active,
+        route_id=route_id,
     )
 
 
@@ -209,4 +245,5 @@ def apply_badge(badge: Badge, data: BadgeData) -> None:
     badge.object_id = data.object_id
     badge.theme_id = data.theme_id
     badge.required_count = data.required_count
+    badge.route_id = data.route_id
     badge.active = data.active

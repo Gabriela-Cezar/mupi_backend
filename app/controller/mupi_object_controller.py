@@ -175,7 +175,7 @@ def open_mupi_object(
     user_id = user.id
 
     mupi = get_mupi_in_range(
-        db, object_id, data.latitude, data.longitude, data.accuracy
+        db, object_id, data.latitude, data.longitude, data.accuracy, user_id=user_id
     )
 
     try:
@@ -191,7 +191,7 @@ def open_mupi_object(
     awarded_data = [serialize_collected(item) for item in awarded]
     visits_total, _ = visit_counts(db, user_id)
 
-    mupi = get_active_mupi(db, object_id, mupi_load_options())
+    mupi = get_active_mupi(db, object_id, mupi_load_options(), user_id)
 
     return {
         **serialize_content(mupi),
@@ -206,9 +206,11 @@ def get_mupi_route(
     object_id: int,
     latitude: float = Query(..., ge=-90, le=90),
     longitude: float = Query(..., ge=-180, le=180),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    mupi = get_active_mupi(db, object_id)
+    # Ponto só de rota: só com a rota ativa que o contém (PT-09)
+    mupi = get_active_mupi(db, object_id, user_id=user.id)
 
     api_key = OPENROUTESERVICE_API_KEY
 

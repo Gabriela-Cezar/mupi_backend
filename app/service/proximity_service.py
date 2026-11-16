@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 
 from app.core import config
 from app.model.mupi_object import MupiObject
+from app.service.active_route_service import active_route_point_ids
 
 EARTH_RADIUS_M = 6_371_000
 
@@ -31,23 +32,29 @@ def bounding_box(lat: float, lon: float, radius_m: float):
     return lat - delta_lat, lat + delta_lat, lon - delta_lon, lon + delta_lon
 
 
-def get_active_mupi(db: Session, object_id: int, options=()) -> MupiObject:
-    """Ponto ativo que existe individualmente (PT-09).
+def get_active_mupi(
+    db: Session,
+    object_id: int,
+    options=(),
+    user_id: int | None = None,
+) -> MupiObject:
+    """Ponto ativo que o usuário pode abrir (PT-09, VIS-01).
 
-    Um ponto que só existe dentro de rotas não pode ser aberto nem ter o
-    "Como chegar" fora de uma rota ativa. Enquanto as rotas não existem
-    (Etapa 5), ele responde como não encontrado.
+    Um ponto que só existe dentro de rotas só pode ser aberto (e ter o "Como
+    chegar") por quem está fazendo uma rota que o contém. Para os outros,
+    ele "não existe" (404).
     """
     mupi = (
         db.query(MupiObject)
         .options(*options)
-        .filter(
-            MupiObject.id == object_id,
-            MupiObject.active.is_(True),
-            MupiObject.standalone.is_(True),
-        )
+        .filter(MupiObject.id == object_id, MupiObject.active.is_(True))
         .first()
     )
+
+    if mupi is not None and not mupi.standalone:
+        in_route = user_id is not None and mupi.id in active_route_point_ids(db, user_id)
+        if not in_route:
+            mupi = None
 
     if mupi is None:
         raise HTTPException(
@@ -89,10 +96,11 @@ def get_mupi_in_range(
     latitude: float,
     longitude: float,
     accuracy: float | None = None,
-    options=()
+    options=(),
+    user_id: int | None = None,
 ) -> MupiObject:
     """Ponto ativo, se o usuário estiver perto dele; senão 404 ou 403 (VIS-01)."""
-    mupi = get_active_mupi(db, object_id, options)
+    mupi = get_active_mupi(db, object_id, options, user_id)
 
     distance = haversine_m(latitude, longitude, mupi.latitude, mupi.longitude)
 

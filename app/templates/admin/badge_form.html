@@ -102,6 +102,23 @@
                 </select>
             </div>
 
+            <div class="form-group" id="group-route">
+                <label for="route_id">Rota</label>
+                {% if routes %}
+                    <select id="route_id" name="route_id">
+                        <option value="">Selecione a rota</option>
+                        {% for route in routes %}
+                            <option value="{{ route.id }}" {% if route.id | string == badge.route_id %}selected{% endif %}>
+                                {{ route.name }}{% if not route.active %} (desativada){% endif %}
+                            </option>
+                        {% endfor %}
+                    </select>
+                    <p class="hint">Concedida ao encerrar a rota com todos os pontos finalizados. Uma por rota.</p>
+                {% else %}
+                    <p>Nenhuma rota cadastrada. <a href="/admin/routes/new">Cadastrar uma rota</a></p>
+                {% endif %}
+            </div>
+
             <div class="form-group" id="group-theme">
                 <label for="theme_id">Tema</label>
                 {% if themes %}
@@ -139,6 +156,7 @@
         const rule = document.getElementById("rule_type");
         const groups = {
             point: document.getElementById("group-point"),
+            route: document.getElementById("group-route"),
             theme: document.getElementById("group-theme"),
             count: document.getElementById("group-count"),
         };
@@ -146,6 +164,7 @@
             point_visit: ["point"],
             visit_count: ["count"],
             theme_visit_count: ["theme", "count"],
+            route_completion: ["route"],
         };
 
         function update() {

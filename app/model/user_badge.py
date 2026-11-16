@@ -25,6 +25,13 @@ class UserBadge(Base):
         nullable=True
     )
 
+    # Rota onde foi conquistada, para a insígnia de conclusão (INS-07)
+    collected_at_route_id = Column(
+        Integer,
+        ForeignKey("routes.id", ondelete="SET NULL"),
+        nullable=True
+    )
+
     collected_at = Column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -33,6 +40,7 @@ class UserBadge(Base):
 
     badge = relationship("Badge")
     mupi_object = relationship("MupiObject")
+    route = relationship("Route")
 
     __table_args__ = (
         Index("ix_user_badges_badge_id", "badge_id"),

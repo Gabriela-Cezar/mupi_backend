@@ -52,6 +52,12 @@ def serialize_collected(item: UserBadge) -> dict:
             if item.mupi_object is not None
             else None
         ),
+        # Rota onde foi conquistada (insígnia de conclusão de rota)
+        "collected_at_route": (
+            {"id": item.route.id, "name": item.route.name}
+            if item.route is not None
+            else None
+        ),
     }
 
 

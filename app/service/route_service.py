@@ -2,6 +2,8 @@
 from sqlalchemy.orm import Session
 
 from app.model.route import Route, RoutePoint
+from app.model.user_active_route import CancelReason
+from app.service.active_route_service import cancel_progress
 
 
 def routes_with_point(db: Session, point_id: int) -> list[Route]:
@@ -24,5 +26,7 @@ def deactivate_routes_with_point(db: Session, point_id: int) -> list[str]:
         if route.active:
             route.active = False
             names.append(route.name)
+            # Quem está fazendo a rota é avisado no app (ROT-10)
+            cancel_progress(db, route.id, CancelReason.ROUTE_DEACTIVATED)
 
     return names
