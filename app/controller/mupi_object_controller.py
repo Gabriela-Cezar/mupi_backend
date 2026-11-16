@@ -1,5 +1,4 @@
 import logging
-from urllib.parse import urlparse
 
 import polyline
 import requests
@@ -18,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from starlette.datastructures import UploadFile as StarletteUploadFile
 from sqlalchemy.orm import Session
 
+from app.controller import mupi_object_form as form
 from app.controller.serializers import (
     mupi_load_options,
     serialize_collected,
@@ -32,7 +32,6 @@ from app.core.templates import templates
 from app.database.database import get_db
 from app.model.badge import Badge, BadgeRule
 from app.model.theme import Theme
-from app.model.midia import MediaType, MupiObjectMedia
 from app.model.mupi_object import MupiObject
 from app.model.mupi_object_badge import MupiObjectBadge  # noqa: F401  (registra a tabela de associação)
 from app.model.user import User
@@ -64,7 +63,6 @@ mupi_object_api_router = APIRouter(
 )
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
-MAX_VIDEO_URL_LENGTH = 500
 
 
 def parse_optional_int(value: str | None, field: str) -> int | None:
@@ -137,15 +135,6 @@ def commit_or_delete_file(db: Session, key: str | None) -> None:
         raise
 
 
-def is_valid_http_url(url: str) -> bool:
-    if len(url) > MAX_VIDEO_URL_LENGTH:
-        return False
-
-    parsed = urlparse(url)
-
-    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
-
-
 # ---------- API do app: resumo (mapa, próximos, busca) ----------
 
 def visited_ids(db: Session, user_id: int) -> set[int]:
@@ -156,6 +145,14 @@ def visited_ids(db: Session, user_id: int) -> set[int]:
     }
 
 
+def visible_on_map():
+    """Pontos ativos que existem individualmente (PT-09, PT-10, PT-11)."""
+    return (
+        MupiObject.active.is_(True),
+        MupiObject.standalone.is_(True),
+    )
+
+
 @mupi_object_api_router.get("")
 def get_mupi_objects(
     user: User = Depends(get_current_user),
@@ -164,7 +161,7 @@ def get_mupi_objects(
     objects = (
         db.query(MupiObject)
         .options(*mupi_load_options())
-        .filter(MupiObject.active.is_(True))
+        .filter(*visible_on_map())
         .order_by(MupiObject.name)
         .all()
     )
@@ -188,7 +185,7 @@ def get_nearby_mupi_objects(
         db.query(MupiObject)
         .options(*mupi_load_options())
         .filter(
-            MupiObject.active.is_(True),
+            *visible_on_map(),
             MupiObject.latitude.between(min_lat, max_lat),
             MupiObject.longitude.between(min_lng, max_lng),
         )
@@ -221,7 +218,7 @@ def search_mupi_objects(
         db.query(MupiObject)
         .options(*mupi_load_options())
         .filter(
-            MupiObject.active.is_(True),
+            *visible_on_map(),
             # autoescape: "%" e "_" digitados valem como texto, não curinga (FAL-17)
             MupiObject.name.icontains(name, autoescape=True),
         )
@@ -389,10 +386,10 @@ def admin_search_mupi_objects(
         {
             "id": obj.id,
             "name": obj.name,
-            "description": obj.description,
             "latitude": obj.latitude,
             "longitude": obj.longitude,
-            "active": obj.active
+            "active": obj.active,
+            "standalone": obj.standalone,
         }
         for obj in objects
     ]
@@ -442,82 +439,52 @@ async def uploaded_photo(request: Request) -> UploadFile | None:
 @router.post("/mupi-objects")
 def create_mupi_object(
     name: str = Form(..., max_length=150),
-    description: str = Form(None),
     latitude: float = Form(..., ge=-90, le=90),
     longitude: float = Form(..., ge=-180, le=180),
     active: bool = Form(False),
+    # Marcado = o ponto só aparece dentro de rotas (PT-09)
+    route_only: bool = Form(False),
+    theme_ids: list[int] = Form([]),
     badge_ids: list[int] = Form([]),
-    video_urls: str = Form(""),
+    section_title: list[str] = Form([]),
+    section_body: list[str] = Form([]),
+    video_url: list[str] = Form([]),
+    video_title: list[str] = Form([]),
+    address: str = Form(""),
+    opening_hours: str = Form(""),
+    accessibility: str = Form(""),
     photo: UploadFile | None = Depends(uploaded_photo),
     db: Session = Depends(get_db),
-    theme_id: str = Form(""),
 ):
+    name = name.strip()
 
-    badges = []
-    
-    parsed_theme_id = parse_optional_int(theme_id, "tema")
+    if not name:
+        raise HTTPException(status_code=400, detail="Informe o nome do ponto.")
 
-    if parsed_theme_id is not None and db.get(Theme, parsed_theme_id) is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Tema não encontrado."
-        )
-
-    if badge_ids:
-        badges = (
-            db.query(Badge)
-            .filter(Badge.id.in_(badge_ids))
-            .all()
-        )
-
-        if len(badges) != len(set(badge_ids)):
-            raise HTTPException(
-                status_code=400,
-                detail="Uma ou mais insígnias informadas não existem."
-            )
-
-        if any(badge.rule_type != BadgeRule.MANUAL for badge in badges):
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Só insígnias do tipo 'visitar este ponto' podem ser "
-                    "ligadas a um ponto."
-                )
-            )
-
-    # Valida a foto antes de gravar qualquer coisa
+    # Valida tudo antes de gravar qualquer coisa
+    themes = form.load_themes(db, theme_ids)
+    badges = form.load_point_badges(db, badge_ids)
+    sections = form.build_sections(section_title, section_body)
+    videos = form.build_videos(video_url, video_title)
     photo_file = read_image(photo) if photo is not None else None
-
-    media_items = []
-
-    for line in video_urls.splitlines():
-        url = line.strip()
-
-        if not url:
-            continue
-
-        if not is_valid_http_url(url):
-            raise HTTPException(
-                status_code=400,
-                detail=f"URL de vídeo inválida: {url}"
-            )
-
-        media_items.append(
-            MupiObjectMedia(
-                type=MediaType.VIDEO,
-                url=url
-            )
-        )
 
     mupi_object = MupiObject(
         name=name,
-        description=description,
         latitude=latitude,
         longitude=longitude,
         active=active,
-        theme_id=parsed_theme_id,
-        media=media_items,
-        badges=badges
+        standalone=not route_only,
+        address=form.optional_text(address, "Endereço", form.MAX_ADDRESS),
+        opening_hours=form.optional_text(
+            opening_hours, "Horário de funcionamento", form.MAX_LONG_TEXT
+        ),
+        accessibility=form.optional_text(
+            accessibility, "Acessibilidade", form.MAX_LONG_TEXT
+        ),
+        themes=themes,
+        badges=badges,
+        sections=sections,
+        videos=videos,
     )
 
     db.add(mupi_object)

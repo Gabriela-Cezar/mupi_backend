@@ -6,8 +6,9 @@ import pytest
 from app.controller import mupi_object_controller
 from app.core.security import create_access_token
 from app.model.badge import Badge, BadgeRule
-from app.model.midia import MediaType, MupiObjectMedia
 from app.model.mupi_object import MupiObject
+from app.model.mupi_object_section import MupiObjectSection
+from app.model.mupi_object_video import MupiObjectVideo
 from app.model.theme import Theme
 from app.model.user_badge import UserBadge
 from app.model.user_visit import UserVisit
@@ -24,9 +25,12 @@ PERTO = {"latitude": LAT, "longitude": LNG}
 LONGE = {"latitude": LAT - 0.01, "longitude": LNG}  # ~1,1 km ao sul
 
 CAMPOS_DO_RESUMO = {
-    "id", "name", "latitude", "longitude", "theme", "photo_url", "has_video", "visited",
+    "id", "name", "latitude", "longitude", "themes", "photo_url", "has_video",
+    "address", "visited",
 }
-CAMPOS_DO_CONTEUDO = {"description", "media", "badges"}
+CAMPOS_DO_CONTEUDO = {"sections", "videos", "opening_hours", "accessibility", "badges"}
+
+VIDEO_ID = "dQw4w9WgXcQ"
 
 
 @pytest.fixture
@@ -54,16 +58,20 @@ def insignia_do_ponto(db_session):
 def ponto(db_session, tema, insignia_do_ponto):
     ponto = MupiObject(
         name="Edifício Exemplo",
-        description="Texto que só aparece perto do ponto.",
         latitude=LAT,
         longitude=LNG,
         active=True,
-        theme_id=tema.id,
+        themes=[tema],
         photo_key=FOTO,
+        address="Rua 1, 100 - Centro",
+        opening_hours="Seg a sex, 9h às 18h",
+        accessibility="Rampa na entrada lateral",
         badges=[insignia_do_ponto],
-        media=[
-            MupiObjectMedia(type=MediaType.VIDEO, url="https://youtu.be/abc123"),
+        sections=[
+            MupiObjectSection(position=1, title="Arquitetura", body="Fachada Art Déco.\nDe 1937."),
+            MupiObjectSection(position=0, title="História", body="Texto que só aparece perto do ponto."),
         ],
+        videos=[MupiObjectVideo(position=0, youtube_id=VIDEO_ID, title="Visita guiada")],
     )
     db_session.add(ponto)
     db_session.commit()
@@ -74,7 +82,6 @@ def ponto(db_session, tema, insignia_do_ponto):
 def ponto_inativo(db_session):
     ponto = MupiObject(
         name="Edifício Desativado",
-        description="Não deve aparecer.",
         latitude=LAT,
         longitude=LNG,
         active=False,
@@ -168,8 +175,9 @@ def test_lista_traz_so_o_resumo(user_client, ponto):
         "name": "Edifício Exemplo",
         "latitude": LAT,
         "longitude": LNG,
-        "theme": {"id": ponto.theme_id, "name": "Arte Deco"},
+        "themes": [{"id": ponto.themes[0].id, "name": "Arte Deco"}],
         "has_video": True,
+        "address": "Rua 1, 100 - Centro",
         "visited": False,
     }
 
@@ -178,7 +186,10 @@ def test_resumo_nao_vaza_conteudo(user_client, ponto):
     texto = user_client.get("/mupi-objects").text
 
     assert "Texto que só aparece perto" not in texto
-    assert "youtu.be" not in texto
+    assert VIDEO_ID not in texto
+    assert "Arquitetura" not in texto
+    assert "Seg a sex" not in texto
+    assert "Rampa" not in texto
     assert "Visitou o Edifício" not in texto
 
 
@@ -187,7 +198,8 @@ def test_ponto_sem_midia_e_sem_tema(user_client, ponto_sem_midia):
 
     assert item["photo_url"] is None
     assert item["has_video"] is False
-    assert item["theme"] is None
+    assert item["themes"] == []
+    assert item["address"] is None
 
 
 def test_lista_nao_mostra_pontos_inativos(user_client, ponto, ponto_inativo):
@@ -239,6 +251,67 @@ def test_busca_traz_resumo_com_distancia(user_client, ponto, ponto_inativo):
     assert item["distance"] > 1000
 
 
+# ---------- Vários temas (PT-03) ----------
+
+def test_ponto_com_varios_temas_traz_todos_em_ordem_alfabetica(user_client, db_session, ponto):
+    ponto.themes.append(Theme(name="Acessível"))
+    db_session.commit()
+
+    [item] = user_client.get("/mupi-objects").json()
+
+    assert [t["name"] for t in item["themes"]] == ["Acessível", "Arte Deco"]
+
+
+# ---------- Pontos que só existem dentro de rotas (PT-09) ----------
+
+@pytest.fixture
+def ponto_so_de_rota(db_session):
+    ponto = MupiObject(
+        name="Edifício Só de Rota",
+        latitude=LAT,
+        longitude=LNG,
+        active=True,
+        standalone=False,
+    )
+    db_session.add(ponto)
+    db_session.commit()
+    return ponto
+
+
+def test_ponto_so_de_rota_fica_fora_do_mapa(user_client, ponto, ponto_so_de_rota):
+    nomes = [p["name"] for p in user_client.get("/mupi-objects").json()]
+
+    assert nomes == ["Edifício Exemplo"]
+
+
+def test_ponto_so_de_rota_fica_fora_dos_proximos(user_client, ponto, ponto_so_de_rota):
+    resposta = user_client.get("/mupi-objects/nearby", params={**PERTO, "radius": 500})
+
+    assert [p["name"] for p in resposta.json()] == ["Edifício Exemplo"]
+
+
+def test_ponto_so_de_rota_fica_fora_da_busca(user_client, ponto, ponto_so_de_rota):
+    resposta = user_client.get("/mupi-objects/search", params={"name": "edifício", **PERTO})
+
+    assert [p["name"] for p in resposta.json()] == ["Edifício Exemplo"]
+
+
+def test_ponto_so_de_rota_nao_abre_sem_rota_ativa(user_client, db_session, ponto_so_de_rota):
+    """Sem rotas ainda (Etapa 5), ninguém tem rota ativa: o ponto não abre."""
+    resposta = abrir(user_client, ponto_so_de_rota)
+
+    assert resposta.status_code == 404
+    assert db_session.query(UserVisit).count() == 0
+
+
+def test_como_chegar_ao_ponto_so_de_rota_retorna_404(user_client, ponto_so_de_rota, monkeypatch):
+    monkeypatch.setattr(mupi_object_controller, "OPENROUTESERVICE_API_KEY", "chave-falsa")
+
+    resposta = user_client.get(f"/mupi-objects/{ponto_so_de_rota.id}/route", params=LONGE)
+
+    assert resposta.status_code == 404
+
+
 # ---------- Abrir o ponto ----------
 
 def test_abrir_longe_retorna_403_sem_conteudo_e_sem_visita(user_client, db_session, ponto):
@@ -259,9 +332,18 @@ def test_abrir_perto_entrega_o_conteudo_completo(user_client, ponto, insignia_do
     assert set(dados) == CAMPOS_DO_RESUMO | CAMPOS_DO_CONTEUDO | {
         "new_visit", "visits_total", "awarded",
     }
-    assert dados["description"] == "Texto que só aparece perto do ponto."
-    assert [m["type"] for m in dados["media"]] == ["video"]
-    assert dados["media"][0]["url"] == "https://youtu.be/abc123"
+    assert dados["sections"] == [
+        {"title": "História", "body": "Texto que só aparece perto do ponto."},
+        {"title": "Arquitetura", "body": "Fachada Art Déco.\nDe 1937."},
+    ]
+    assert dados["videos"] == [{
+        "youtube_id": VIDEO_ID,
+        "title": "Visita guiada",
+        "url": f"https://www.youtube.com/watch?v={VIDEO_ID}",
+    }]
+    assert dados["address"] == "Rua 1, 100 - Centro"
+    assert dados["opening_hours"] == "Seg a sex, 9h às 18h"
+    assert dados["accessibility"] == "Rampa na entrada lateral"
     assert link_assinado(dados["photo_url"], FOTO)
     assert [b["name"] for b in dados["badges"]] == ["Visitou o Edifício"]
     assert dados["visited"] is True

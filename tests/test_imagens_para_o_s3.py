@@ -113,7 +113,7 @@ def test_depois_do_script_a_0007_remove_as_imagens_do_banco(banco_antigo, s3_sim
     url, engine = banco_antigo
     move_images(engine)
 
-    command.upgrade(alembic_cfg(url), "head")
+    command.upgrade(alembic_cfg(url), "0007")
 
     assert not blobs_still_in_database(engine)
     assert {"data", "mime_type"}.isdisjoint(colunas(engine, "mupi_object_media"))

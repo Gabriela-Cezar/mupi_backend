@@ -13,7 +13,9 @@ Substitui as tabelas "Ordem sugerida" dos arquivos `00_visao_geral.md`.
 ## Estado em 12/11/2026
 
 - **Backend:** FAL-01 a FAL-19 resolvidas (FAL-20, testes, segue contínua); migrações 0001 a 0005; USR-05 e USR-11 prontas.
-- **App:** APP-FAL-01 a 10 e APP-AUT-05 prontas. Pendentes da etapa de correções: `.env` do app (APP-FAL-13), código duplicado (APP-FAL-11), `auth_service` ainda fora do `ApiClient` (APP-INF-01) e separação `MupiSummary`/`MupiContent` (vai para a Etapa 2).
+- **App:** APP-FAL-01 a 11, APP-AUT-05 e APP-INF-01 prontas; "Como chegar" renomeado (13/11). Pendentes: apagar o `.env` do app (APP-FAL-13, manual) e separação `MupiSummary`/`MupiContent` (vai para a Etapa 2).
+- **Desenvolvimento sem nuvem (13/11):** a escolha do provedor (AWS ou alternativa) não bloqueia as Etapas 2, 4, 5 e 6. Banco local; arquivos num S3 local (MinIO, via `S3_ENDPOINT_URL`) ou sem fotos (`photo_url` nulo). Só a publicação em produção (fim da Etapa 3) espera a decisão.
+- **`flutter analyze` falha com o caminho com acento** ("Área de Trabalho", APP-FAL-15): o servidor de análise quebra. Enquanto a pasta não for movida, rodar a análise numa cópia do projeto fora dessa pasta.
 
 ---
 
@@ -29,10 +31,10 @@ Tarefas externas que demoram e não dependem de código:
 - [ ] Rascunho da política de privacidade (APP-INF-12)
 
 App:
-- [ ] Apagar o `.env` do app (APP-FAL-13)
-- [ ] Remover código duplicado e sem uso (APP-FAL-11)
-- [ ] Migrar `auth_service` para o `ApiClient`; mensagens para 429 no login e no reenvio (APP-INF-01, APP-AUT-01, APP-AUT-02)
-- [ ] Renomear o recurso atual "rota" para **"Como chegar"** (`DirectionsService`, `Directions`, "Encerrar trajeto") — libera o nome "rota" para a Etapa 5
+- [ ] Apagar o `.env` do app (APP-FAL-13) — fazer manualmente; o `EMAIL_FROM` e a chave do Resend já estão no `.env` do backend
+- [x] Remover código duplicado e sem uso (APP-FAL-11)
+- [x] Migrar `auth_service` para o `ApiClient`; mensagens para 429 no login e no reenvio (APP-INF-01, APP-AUT-01, APP-AUT-02) — o botão de reenvio espera o `Retry-After`
+- [x] Renomear o recurso atual "rota" para **"Como chegar"** (`DirectionsService`, `Directions`, "Encerrar trajeto") — libera o nome "rota" para a Etapa 5. A rota do backend continua `GET /mupi-objects/{id}/route`
 
 ## Etapa 1 — Arquivos no S3
 
@@ -46,10 +48,10 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 
 ## Etapa 2 — Novo modelo do ponto, painel e mapa
 
-- [ ] **Backend:** vários temas por ponto — `mupi_object_themes`, migrando `theme_id` (PT-02, PT-03)
-- [ ] **Backend:** blocos de texto — `mupi_object_sections`, migrando `description` (PT-04)
-- [ ] **Backend:** foto única no S3 (PT-05), vídeos do YouTube com ID extraído (PT-07), campos de estabelecimento (PT-08), "existe individualmente" (PT-09)
-- [ ] **Backend:** resumo do mapa, próximos e busca com `themes` (PT-10, PT-11); conteúdo completo na abertura (PT-13); remover rotas antigas de imagem/mídia (PT-14)
+- [x] **Backend:** vários temas por ponto — `mupi_object_themes`, migrando `theme_id` (PT-02, PT-03) — migração 0008 (16/11)
+- [x] **Backend:** blocos de texto — `mupi_object_sections`, migrando `description` (PT-04) — a `description` antiga vira o bloco "Sobre o ponto"
+- [ ] **Backend:** foto única no S3 (PT-05), vídeos do YouTube com ID extraído (PT-07), campos de estabelecimento (PT-08), "existe individualmente" (PT-09) — PT-07, 08 e 09 feitos (16/11; `mupi_object_videos`, `mupi_object_media` removida); falta substituir/remover a foto na edição (vai com o ADM-04)
+- [x] **Backend:** resumo do mapa, próximos e busca com `themes` (PT-10, PT-11); conteúdo completo na abertura (PT-13); remover rotas antigas de imagem/mídia (PT-14) — 16/11
 - [ ] **Backend:** painel de pontos e temas com desativar e excluir (ADM-04, ADM-05, ADM-08 e ADM-09 do ponto e do tema, ADM-12)
 - [ ] **App:** `MupiSummary` com `themes` e `MupiContent` separados (APP-MAP-01, APP-PON-01)
 - [ ] **App:** carregar todos os pontos com `GET /mupi-objects`, distância calculada no app, recarga periódica e ao voltar ao mapa (APP-MAP-02)

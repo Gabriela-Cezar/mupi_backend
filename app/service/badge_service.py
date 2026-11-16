@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 
 from app.model.badge import Badge, BadgeRule
 from app.model.mupi_object import MupiObject
+from app.model.mupi_object_theme import MupiObjectTheme
 from app.model.user_badge import UserBadge
 from app.model.user_visit import UserVisit
 
@@ -13,22 +14,25 @@ def visit_counts(db: Session, user_id: int) -> tuple[int, dict[int, int]]:
     Conta todas as visitas registradas, inclusive a pontos hoje desativados:
     a visita aconteceu, e desativar um ponto não pode fazer o progresso das
     insígnias do usuário diminuir (FAL-12 / INS-05).
+
+    Um ponto com vários temas conta uma vez para cada tema (PT-03).
     """
-    rows = (
-        db.query(MupiObject.theme_id, func.count(UserVisit.object_id))
-        .select_from(UserVisit)
-        .join(MupiObject, MupiObject.id == UserVisit.object_id)
+    total = (
+        db.query(func.count(UserVisit.object_id))
         .filter(UserVisit.user_id == user_id)
-        .group_by(MupiObject.theme_id)
+        .scalar()
+    )
+
+    rows = (
+        db.query(MupiObjectTheme.theme_id, func.count(UserVisit.object_id))
+        .select_from(UserVisit)
+        .join(MupiObjectTheme, MupiObjectTheme.object_id == UserVisit.object_id)
+        .filter(UserVisit.user_id == user_id)
+        .group_by(MupiObjectTheme.theme_id)
         .all()
     )
 
-    total = sum(count for _, count in rows)
-    by_theme = {
-        theme_id: count for theme_id, count in rows if theme_id is not None
-    }
-
-    return total, by_theme
+    return total, dict(rows)
 
 
 def progress_of(badge: Badge, total: int, by_theme: dict[int, int]) -> int:

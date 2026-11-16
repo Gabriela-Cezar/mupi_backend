@@ -35,12 +35,19 @@ def bounding_box(lat: float, lon: float, radius_m: float):
 
 
 def get_active_mupi(db: Session, object_id: int, options=()) -> MupiObject:
+    """Ponto ativo que existe individualmente (PT-09).
+
+    Um ponto que só existe dentro de rotas não pode ser aberto nem ter o
+    "Como chegar" fora de uma rota ativa. Enquanto as rotas não existem
+    (Etapa 5), ele responde como não encontrado.
+    """
     mupi = (
         db.query(MupiObject)
         .options(*options)
         .filter(
             MupiObject.id == object_id,
-            MupiObject.active.is_(True)
+            MupiObject.active.is_(True),
+            MupiObject.standalone.is_(True),
         )
         .first()
     )

@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Cadastrar Objeto MUPI</title>
+    <title>{% if point %}Editar{% else %}Cadastrar{% endif %} ponto MUPI</title>
 
     <link
         rel="stylesheet"
@@ -15,18 +15,15 @@
 
 {% include "admin/_admin_header.html" %}
 
+{% set selected_themes = point.themes | map(attribute="id") | list if point else [] %}
+{% set selected_badges = point.badges | map(attribute="id") | list if point else [] %}
+
 <div class="container">
 
-    <h1>Cadastrar Objeto MUPI</h1>
-
-    <p>
-        Cadastre as informações, localização, insígnias e mídias
-        relacionadas ao objeto.
-    </p>
-
+    <h1>{% if point %}Editar ponto MUPI{% else %}Cadastrar ponto MUPI{% endif %}</h1>
 
     <form
-        action="/admin/mupi-objects"
+        action="{{ form_action | default('/admin/mupi-objects') }}"
         method="post"
         enctype="multipart/form-data"
     >
@@ -36,114 +33,201 @@
 
         <h2>Informações</h2>
 
-
         <div class="form-group">
-
-            <label for="name">
-                Nome
-            </label>
-
+            <label for="name">Nome</label>
             <input
                 type="text"
                 id="name"
                 name="name"
-                placeholder="Nome do objeto MUPI"
+                maxlength="150"
+                placeholder="Nome do ponto MUPI"
+                value="{{ point.name if point else '' }}"
                 required
             >
-
         </div>
-
 
         <div class="form-group">
+            <label>Temas</label>
 
-            <label for="description">
-                Descrição
-            </label>
-
-            <textarea
-                id="description"
-                name="description"
-                rows="5"
-                placeholder="Descreva o objeto MUPI..."
-            ></textarea>
-
+            {% if themes %}
+                <div class="badge-list">
+                    {% for theme in themes %}
+                        <label class="badge-option">
+                            <input
+                                type="checkbox"
+                                name="theme_ids"
+                                value="{{ theme.id }}"
+                                {% if theme.id in selected_themes %}checked{% endif %}
+                            >
+                            <span>{{ theme.name }}</span>
+                        </label>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p>Nenhum tema cadastrado. <a href="/admin/themes/new">Cadastrar um tema</a></p>
+            {% endif %}
         </div>
 
-
-        <div class="form-group">
-
-            <label for="theme_id">
-                Tema
-            </label>
-
-            <select id="theme_id" name="theme_id">
-
-                <option value="">Sem tema</option>
-
-                {% for theme in themes %}
-                    <option value="{{ theme.id }}">{{ theme.name }}</option>
-                {% endfor %}
-
-            </select>
-
-        </div>
 
         <h2>Localização</h2>
 
-
         <div class="form-group">
-
-            <label for="latitude">
-                Latitude
-            </label>
-
+            <label for="latitude">Latitude</label>
             <input
                 type="number"
                 id="latitude"
                 name="latitude"
                 step="any"
                 placeholder="Ex.: -16.6869"
+                value="{{ point.latitude if point else '' }}"
                 required
             >
-
         </div>
 
-
         <div class="form-group">
-
-            <label for="longitude">
-                Longitude
-            </label>
-
+            <label for="longitude">Longitude</label>
             <input
                 type="number"
                 id="longitude"
                 name="longitude"
                 step="any"
                 placeholder="Ex.: -49.2648"
+                value="{{ point.longitude if point else '' }}"
                 required
             >
-
         </div>
-
 
 
         <h2>Status</h2>
 
-
         <div class="form-group">
-
             <label>
                 <input
                     type="checkbox"
                     name="active"
                     value="true"
-                    checked
+                    {% if not point or point.active %}checked{% endif %}
                 >
-
-                MUPI ativo
+                Ponto ativo (aparece no app)
             </label>
 
+            <label>
+                <input
+                    type="checkbox"
+                    name="route_only"
+                    value="true"
+                    {% if point and not point.standalone %}checked{% endif %}
+                >
+                Só aparece dentro de rotas (fica fora do mapa e da busca)
+            </label>
+        </div>
+
+
+        <h2>Blocos de texto</h2>
+
+        <p>
+            Cada bloco tem um título (exibido em negrito no app) e um texto.
+            As quebras de linha do texto são mantidas. A ordem aqui é a ordem no app.
+        </p>
+
+        <div id="sections" class="repeat-list">
+            {% for section in (point.sections if point else []) %}
+                <div class="repeat-item">
+                    <div class="form-group">
+                        <label>Título</label>
+                        <input type="text" name="section_title" maxlength="150" value="{{ section.title }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Texto</label>
+                        <textarea name="section_body" rows="6">{{ section.body }}</textarea>
+                    </div>
+                    <div class="repeat-actions">
+                        <button type="button" class="secondary" data-move="-1">Subir</button>
+                        <button type="button" class="secondary" data-move="1">Descer</button>
+                        <button type="button" class="danger" data-remove>Remover</button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <button type="button" class="secondary" data-add="section">Adicionar bloco</button>
+
+
+        <h2>Foto</h2>
+
+        <div class="form-group">
+            {% if point and photo_url %}
+                <img src="{{ photo_url }}" alt="Foto atual do ponto" class="photo-preview">
+            {% endif %}
+
+            <label for="photo">
+                {% if point and point.photo_key %}Substituir a foto{% else %}Foto do ponto{% endif %}
+                (PNG, JPEG ou WebP, até 5 MB). Aparece no mapa.
+            </label>
+
+            <input
+                type="file"
+                id="photo"
+                name="photo"
+                accept="image/png,image/jpeg,image/webp"
+            >
+
+            {% if point and point.photo_key %}
+                <label>
+                    <input type="checkbox" name="remove_photo" value="true">
+                    Remover a foto atual
+                </label>
+            {% endif %}
+        </div>
+
+
+        <h2>Vídeos do YouTube</h2>
+
+        <p>
+            Links youtube.com/watch?v=..., youtu.be/... ou youtube.com/shorts/....
+            Publique os vídeos como "não listado" ou "público": vídeos privados não tocam no app.
+        </p>
+
+        <div id="videos" class="repeat-list">
+            {% for video in (point.videos if point else []) %}
+                <div class="repeat-item">
+                    <div class="form-group">
+                        <label>Link</label>
+                        <input type="url" name="video_url" value="https://www.youtube.com/watch?v={{ video.youtube_id }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Título (opcional)</label>
+                        <input type="text" name="video_title" maxlength="150" value="{{ video.title or '' }}">
+                    </div>
+                    <div class="repeat-actions">
+                        <button type="button" class="secondary" data-move="-1">Subir</button>
+                        <button type="button" class="secondary" data-move="1">Descer</button>
+                        <button type="button" class="danger" data-remove>Remover</button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <button type="button" class="secondary" data-add="video">Adicionar vídeo</button>
+
+
+        <h2>Estabelecimento</h2>
+
+        <p>Opcional. Preencha quando o ponto for um estabelecimento parceiro.</p>
+
+        <div class="form-group">
+            <label for="address">Endereço</label>
+            <input type="text" id="address" name="address" maxlength="300" value="{{ point.address or '' if point else '' }}">
+        </div>
+
+        <div class="form-group">
+            <label for="opening_hours">Horário de funcionamento</label>
+            <textarea id="opening_hours" name="opening_hours" rows="3">{{ point.opening_hours or '' if point else '' }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="accessibility">Informações de acessibilidade</label>
+            <textarea id="accessibility" name="accessibility" rows="3">{{ point.accessibility or '' if point else '' }}</textarea>
         </div>
 
 
@@ -154,97 +238,99 @@
             contagem (N pontos) valem para todos os pontos e não aparecem aqui.
         </p>
 
-
         {% if badges %}
-
             <div class="badge-list">
-
                 {% for badge in badges %}
-
                     <label class="badge-option">
-
                         <input
                             type="checkbox"
                             name="badge_ids"
                             value="{{ badge.id }}"
+                            {% if badge.id in selected_badges %}checked{% endif %}
                         >
-
-                        <span>
-                            {{ badge.name }}
-                        </span>
-
+                        <span>{{ badge.name }}</span>
                     </label>
-
                 {% endfor %}
-
             </div>
-
         {% else %}
-
-            <p>
-                Nenhuma insígnia do tipo "visitar este ponto" cadastrada.
-            </p>
-
-            <a href="/admin/badges">
-                Cadastrar uma insígnia
-            </a>
-
+            <p>Nenhuma insígnia do tipo "visitar este ponto" cadastrada.</p>
         {% endif %}
 
-
-        <h2>Foto</h2>
-
-
-        <div class="form-group">
-
-            <label for="photo">
-                Foto do ponto (PNG, JPEG ou WebP, até 5 MB). Aparece no mapa.
-            </label>
-
-            <input
-                type="file"
-                id="photo"
-                name="photo"
-                accept="image/png,image/jpeg,image/webp"
-            >
-
-        </div>
-
-
-        <h2>Vídeos</h2>
-
-
-        <div class="form-group">
-
-            <label for="video_urls">
-                URLs dos vídeos
-            </label>
-
-            <textarea
-                id="video_urls"
-                name="video_urls"
-                rows="5"
-                placeholder="Uma URL por linha"
-            ></textarea>
-
-        </div>
+        <a href="/admin/badges">Cadastrar uma insígnia</a>
 
 
         <button type="submit">
-            Cadastrar MUPI
+            {% if point %}Salvar alterações{% else %}Cadastrar ponto{% endif %}
         </button>
-
 
     </form>
 
-
-    <br>
-
-    <a href="/admin/badges">
-        Cadastrar nova insígnia
-    </a>
-
 </div>
+
+
+<template id="section-template">
+    <div class="repeat-item">
+        <div class="form-group">
+            <label>Título</label>
+            <input type="text" name="section_title" maxlength="150">
+        </div>
+        <div class="form-group">
+            <label>Texto</label>
+            <textarea name="section_body" rows="6"></textarea>
+        </div>
+        <div class="repeat-actions">
+            <button type="button" class="secondary" data-move="-1">Subir</button>
+            <button type="button" class="secondary" data-move="1">Descer</button>
+            <button type="button" class="danger" data-remove>Remover</button>
+        </div>
+    </div>
+</template>
+
+<template id="video-template">
+    <div class="repeat-item">
+        <div class="form-group">
+            <label>Link</label>
+            <input type="url" name="video_url" placeholder="https://youtu.be/...">
+        </div>
+        <div class="form-group">
+            <label>Título (opcional)</label>
+            <input type="text" name="video_title" maxlength="150">
+        </div>
+        <div class="repeat-actions">
+            <button type="button" class="secondary" data-move="-1">Subir</button>
+            <button type="button" class="secondary" data-move="1">Descer</button>
+            <button type="button" class="danger" data-remove>Remover</button>
+        </div>
+    </div>
+</template>
+
+<script>
+    // Blocos de texto e vídeos: adicionar, remover e reordenar
+    document.addEventListener("click", function (event) {
+        const button = event.target.closest("button[type=button]");
+        if (!button) return;
+
+        if (button.dataset.add) {
+            const list = document.getElementById(button.dataset.add + "s");
+            const template = document.getElementById(button.dataset.add + "-template");
+            const item = template.content.firstElementChild.cloneNode(true);
+            list.appendChild(item);
+            item.querySelector("input, textarea").focus();
+            return;
+        }
+
+        const item = button.closest(".repeat-item");
+        if (!item) return;
+
+        if (button.hasAttribute("data-remove")) {
+            item.remove();
+        } else if (button.dataset.move === "-1" && item.previousElementSibling) {
+            item.parentNode.insertBefore(item, item.previousElementSibling);
+        } else if (button.dataset.move === "1" && item.nextElementSibling) {
+            item.parentNode.insertBefore(item.nextElementSibling, item);
+        }
+    });
+</script>
 
 </body>
 

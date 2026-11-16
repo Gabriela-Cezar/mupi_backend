@@ -27,7 +27,7 @@ def criar_ponto(db_session, nome, tema=None, ativo=True, lat=LAT, lng=LNG):
         latitude=lat,
         longitude=lng,
         active=ativo,
-        theme_id=tema.id if tema else None,
+        themes=[tema] if tema else [],
     )
     db_session.add(ponto)
     db_session.commit()
@@ -105,6 +105,36 @@ def test_varios_temas(db_session, usuario, arte_deco):
     assert visit_counts(db_session, usuario.id) == (
         3, {arte_deco.id: 2, modernismo.id: 1},
     )
+
+
+def test_ponto_com_dois_temas_conta_para_os_dois(db_session, usuario, arte_deco):
+    """PT-03: a visita vale para cada tema do ponto, mas uma vez só no total."""
+    modernismo = Theme(name="Modernismo")
+    db_session.add(modernismo)
+    db_session.commit()
+    ponto = criar_ponto(db_session, "A", arte_deco)
+    ponto.themes.append(modernismo)
+    db_session.commit()
+    visitar(db_session, usuario, ponto)
+
+    assert visit_counts(db_session, usuario.id) == (
+        1, {arte_deco.id: 1, modernismo.id: 1},
+    )
+
+
+def test_ponto_com_dois_temas_concede_insignias_dos_dois(db_session, usuario, arte_deco):
+    modernismo = Theme(name="Modernismo")
+    db_session.add(modernismo)
+    db_session.commit()
+    deco = criar_insignia(db_session, "1 Arte Deco", BadgeRule.THEME_VISIT_COUNT, 1, arte_deco)
+    moderna = criar_insignia(db_session, "1 Modernismo", BadgeRule.THEME_VISIT_COUNT, 1, modernismo)
+    ponto = criar_ponto(db_session, "A", arte_deco)
+    ponto.themes.append(modernismo)
+    db_session.commit()
+
+    _, ganhas = register_visit(db_session, usuario.id, ponto)
+
+    assert {g.badge_id for g in ganhas} == {deco.id, moderna.id}
 
 
 # ---------- Concessão de insígnias ----------

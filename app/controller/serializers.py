@@ -7,8 +7,10 @@ O ponto MUPI tem duas formas (FAL-06):
 from sqlalchemy.orm import selectinload
 
 from app.model.badge import Badge
-from app.model.midia import MediaType, MupiObjectMedia
+from app.core.youtube import watch_url
 from app.model.mupi_object import MupiObject
+from app.model.mupi_object_section import MupiObjectSection
+from app.model.mupi_object_video import MupiObjectVideo
 from app.model.user_badge import UserBadge
 from app.service import storage_service
 
@@ -53,17 +55,22 @@ def serialize_collected(item: UserBadge) -> dict:
     }
 
 
-# ---------- Mídias ----------
+# ---------- Conteúdo do ponto ----------
 
-def serialize_media(media: MupiObjectMedia) -> dict:
-    # Só vídeos: a foto do ponto fica em photo_url
+def serialize_theme(theme) -> dict:
+    return {"id": theme.id, "name": theme.name}
+
+
+def serialize_section(section: MupiObjectSection) -> dict:
+    # Texto limpo, sem marcações: o app formata e pode ler em voz alta (PT-04)
+    return {"title": section.title, "body": section.body}
+
+
+def serialize_video(video: MupiObjectVideo) -> dict:
     return {
-        "id": media.id,
-        "object_id": media.object_id,
-        "type": media.type.value,
-        "url": media.url,
-        "title": media.title,
-        "description": media.description,
+        "youtube_id": video.youtube_id,
+        "title": video.title,
+        "url": watch_url(video.youtube_id),
     }
 
 
@@ -77,8 +84,9 @@ def _photo_url(obj: MupiObject) -> str | None:
 def mupi_load_options():
     return (
         selectinload(MupiObject.badges),
-        selectinload(MupiObject.media),
-        selectinload(MupiObject.theme),
+        selectinload(MupiObject.themes),
+        selectinload(MupiObject.sections),
+        selectinload(MupiObject.videos),
     )
 
 
@@ -87,19 +95,16 @@ def serialize_summary(
     visited: bool,
     distance: float | None = None
 ) -> dict:
-    """Resumo do ponto: sem texto, vídeos nem insígnias."""
+    """Resumo do ponto (PT-10): sem blocos de texto, vídeos nem insígnias."""
     data = {
         "id": obj.id,
         "name": obj.name,
         "latitude": obj.latitude,
         "longitude": obj.longitude,
-        "theme": (
-            {"id": obj.theme.id, "name": obj.theme.name}
-            if obj.theme is not None
-            else None
-        ),
+        "themes": [serialize_theme(t) for t in obj.themes],
         "photo_url": _photo_url(obj),
-        "has_video": any(m.type == MediaType.VIDEO for m in obj.media),
+        "has_video": bool(obj.videos),
+        "address": obj.address,
         "visited": visited,
     }
 
@@ -110,10 +115,12 @@ def serialize_summary(
 
 
 def serialize_content(obj: MupiObject) -> dict:
-    """Conteúdo completo: só para quem abriu o ponto estando perto."""
+    """Conteúdo completo (PT-13): só para quem abriu o ponto estando perto."""
     return {
         **serialize_summary(obj, visited=True),
-        "description": obj.description,
-        "media": [serialize_media(m) for m in obj.media],
+        "sections": [serialize_section(s) for s in obj.sections],
+        "videos": [serialize_video(v) for v in obj.videos],
+        "opening_hours": obj.opening_hours,
+        "accessibility": obj.accessibility,
         "badges": [serialize_badge(b) for b in obj.badges],
     }

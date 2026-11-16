@@ -16,7 +16,10 @@ from sqlalchemy.orm import Session
 
 from app.database.all_models import Base
 from app.model.badge import Badge, BadgeRule
-from app.model.midia import MediaType, MupiObjectMedia
+from app.model.mupi_object_section import MupiObjectSection
+from app.model.mupi_object_theme import MupiObjectTheme
+from app.model.mupi_object_video import MupiObjectVideo
+from app.model.theme import Theme
 from app.model.mupi_object import MupiObject
 from app.model.mupi_object_badge import MupiObjectBadge
 from app.model.user import User
@@ -120,14 +123,22 @@ def test_ponto_visitado_pode_ser_desativado(db, usuario):
 def test_excluir_ponto_sem_visitas_funciona(db):
     ponto = criar_ponto(db)
     insignia = criar_insignia(db)
-    db.add(MupiObjectMedia(object_id=ponto.id, type=MediaType.VIDEO, url="https://youtu.be/x"))
+    tema = Theme(name="Arte Deco")
+    db.add(tema)
+    db.flush()
+    db.add(MupiObjectVideo(object_id=ponto.id, position=0, youtube_id="dQw4w9WgXcQ"))
+    db.add(MupiObjectSection(object_id=ponto.id, position=0, title="História", body="Texto"))
+    db.add(MupiObjectTheme(object_id=ponto.id, theme_id=tema.id))
     db.add(MupiObjectBadge(object_id=ponto.id, badge_id=insignia.id))
     db.commit()
 
     excluir(db, ponto)
 
     assert db.get(MupiObject, ponto.id) is None
-    assert contar(db, MupiObjectMedia) == 0      # os vídeos do ponto vão junto
+    assert contar(db, MupiObjectVideo) == 0      # os vídeos do ponto vão junto
+    assert contar(db, MupiObjectSection) == 0    # e os blocos de texto
+    assert contar(db, MupiObjectTheme) == 0      # só a ligação; o tema fica
+    assert db.get(Theme, tema.id) is not None
     assert contar(db, MupiObjectBadge) == 0      # só a ligação; a insígnia fica
     assert db.get(Badge, insignia.id) is not None
 

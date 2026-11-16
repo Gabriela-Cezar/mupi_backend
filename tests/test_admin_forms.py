@@ -81,12 +81,22 @@ def test_formulario_de_insignia_sem_temas_avisa(client):
 
 # ---------- Página do formulário de ponto ----------
 
-def test_formulario_de_ponto_tem_campo_de_tema(client, tema):
+def test_formulario_de_ponto_tem_temas_para_marcar(client, tema):
     html = client.get("/admin/mupi-objects").text
 
-    assert 'name="theme_id"' in html
-    assert '<option value="">Sem tema</option>' in html
-    assert f'<option value="{tema.id}">Arte Deco</option>' in html
+    assert 'name="theme_ids"' in html
+    assert f'value="{tema.id}"' in html
+    assert "Arte Deco" in html
+
+
+def test_formulario_de_ponto_tem_os_campos_novos(client):
+    html = client.get("/admin/mupi-objects").text
+
+    for campo in (
+        "route_only", "section_title", "section_body", "video_url", "video_title",
+        "address", "opening_hours", "accessibility", "photo",
+    ):
+        assert f'name="{campo}"' in html, campo
 
 
 def test_formulario_de_ponto_lista_so_insignias_manuais(client, insignias):
