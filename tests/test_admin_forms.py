@@ -82,7 +82,7 @@ def test_formulario_de_insignia_sem_temas_avisa(client):
 # ---------- Página do formulário de ponto ----------
 
 def test_formulario_de_ponto_tem_temas_para_marcar(client, tema):
-    html = client.get("/admin/mupi-objects").text
+    html = client.get("/admin/mupi-objects/new").text
 
     assert 'name="theme_ids"' in html
     assert f'value="{tema.id}"' in html
@@ -90,7 +90,7 @@ def test_formulario_de_ponto_tem_temas_para_marcar(client, tema):
 
 
 def test_formulario_de_ponto_tem_os_campos_novos(client):
-    html = client.get("/admin/mupi-objects").text
+    html = client.get("/admin/mupi-objects/new").text
 
     for campo in (
         "route_only", "section_title", "section_body", "video_url", "video_title",
@@ -100,7 +100,7 @@ def test_formulario_de_ponto_tem_os_campos_novos(client):
 
 
 def test_formulario_de_ponto_lista_so_insignias_manuais(client, insignias):
-    html = client.get("/admin/mupi-objects").text
+    html = client.get("/admin/mupi-objects/new").text
 
     assert f'value="{insignias["manual"].id}"' in html
     assert "Visitou o Edifício" in html
@@ -244,12 +244,13 @@ def dados_do_ponto(**extras):
 def test_ponto_aceita_insignia_manual(client, db_session, insignias):
     resposta = client.post(
         "/admin/mupi-objects",
+        follow_redirects=False,
         data=dados_do_ponto(badge_ids=[str(insignias["manual"].id)]),
     )
 
-    assert resposta.status_code == 200
+    assert resposta.status_code == 303
     db_session.expire_all()
-    ponto = db_session.get(MupiObject, resposta.json()["id"])
+    ponto = db_session.query(MupiObject).one()
     assert [b.id for b in ponto.badges] == [insignias["manual"].id]
 
 
@@ -257,11 +258,12 @@ def test_ponto_aceita_insignia_manual(client, db_session, insignias):
 def test_ponto_recusa_insignia_de_contagem(client, db_session, insignias, tipo):
     resposta = client.post(
         "/admin/mupi-objects",
+        follow_redirects=False,
         data=dados_do_ponto(badge_ids=[str(insignias[tipo].id)]),
     )
 
     assert resposta.status_code == 400
-    assert "visitar este ponto" in resposta.json()["detail"]
+    assert "visitar este ponto" in resposta.text
     assert db_session.query(MupiObject).count() == 0
 
 
@@ -284,11 +286,12 @@ def test_ponto_sem_foto_e_salvo(client, db_session, s3_simulado):
     """
     resposta = client.post(
         "/admin/mupi-objects",
+        follow_redirects=False,
         data=dados_do_ponto(name="Unigoias"),
         files={"photo": CAMPO_DE_ARQUIVO_VAZIO},
     )
 
-    assert resposta.status_code == 200
+    assert resposta.status_code == 303
     ponto = ponto_salvo(db_session)
     assert ponto.name == "Unigoias"
     assert ponto.photo_key is None
@@ -296,20 +299,21 @@ def test_ponto_sem_foto_e_salvo(client, db_session, s3_simulado):
 
 
 def test_ponto_sem_nenhum_campo_de_foto_e_salvo(client, db_session):
-    resposta = client.post("/admin/mupi-objects", data=dados_do_ponto())
+    resposta = client.post("/admin/mupi-objects", data=dados_do_ponto(), follow_redirects=False)
 
-    assert resposta.status_code == 200
+    assert resposta.status_code == 303
     assert ponto_salvo(db_session).photo_key is None
 
 
 def test_foto_vai_para_o_s3_e_o_banco_guarda_so_a_chave(client, db_session, s3_simulado):
     resposta = client.post(
         "/admin/mupi-objects",
+        follow_redirects=False,
         data=dados_do_ponto(),
         files={"photo": ("foto.png", PNG, "image/png")},
     )
 
-    assert resposta.status_code == 200
+    assert resposta.status_code == 303
     ponto = ponto_salvo(db_session)
     assert re.fullmatch(rf"points/{ponto.id}/photo-[0-9a-f]{{32}}\.png", ponto.photo_key)
     assert chaves_no_bucket(s3_simulado) == [ponto.photo_key]
@@ -323,6 +327,7 @@ def test_tipo_da_foto_vem_do_conteudo_e_nao_do_nome(client, db_session, s3_simul
     """Um JPEG chamado "foto.png" é guardado como JPEG."""
     client.post(
         "/admin/mupi-objects",
+        follow_redirects=False,
         data=dados_do_ponto(),
         files={"photo": ("foto.png", JPEG, "image/png")},
     )
@@ -335,6 +340,7 @@ def test_tipo_da_foto_vem_do_conteudo_e_nao_do_nome(client, db_session, s3_simul
 def test_arquivo_que_nao_e_imagem_e_recusado(client, db_session, s3_simulado):
     resposta = client.post(
         "/admin/mupi-objects",
+        follow_redirects=False,
         data=dados_do_ponto(),
         files={"photo": ("foto.png", b"nao sou imagem", "image/png")},
     )
@@ -349,12 +355,14 @@ def test_sem_s3_configurado_a_foto_e_recusada_com_mensagem(client, db_session, m
 
     resposta = client.post(
         "/admin/mupi-objects",
+        follow_redirects=False,
         data=dados_do_ponto(),
         files={"photo": ("foto.png", PNG, "image/png")},
     )
 
     assert resposta.status_code == 503
-    assert "S3_BUCKET" in resposta.json()["detail"]
+    assert "S3_BUCKET" in resposta.text
+    assert 'value="Edifício Exemplo"' in resposta.text  # o formulário volta preenchido
     assert db_session.query(MupiObject).count() == 0
 
 
@@ -366,11 +374,13 @@ def test_falha_do_s3_nao_salva_o_ponto(client, db_session, monkeypatch):
 
     resposta = client.post(
         "/admin/mupi-objects",
+        follow_redirects=False,
         data=dados_do_ponto(),
         files={"photo": ("foto.png", PNG, "image/png")},
     )
 
     assert resposta.status_code == 502
+    assert "Não foi possível salvar o arquivo" in resposta.text
     assert db_session.query(MupiObject).count() == 0
 
 
@@ -400,6 +410,7 @@ def test_formulario_completo_como_o_navegador_envia(admin_client, db_session):
 
     resposta = admin_client.post(
         "/admin/mupi-objects",
+        follow_redirects=False,
         data=dados_do_ponto(
             name="Unigoias",
             description="",
@@ -410,7 +421,7 @@ def test_formulario_completo_como_o_navegador_envia(admin_client, db_session):
         files={"photo": CAMPO_DE_ARQUIVO_VAZIO},
     )
 
-    assert resposta.status_code == 200
+    assert resposta.status_code == 303
     assert ponto_salvo(db_session).name == "Unigoias"
 
 

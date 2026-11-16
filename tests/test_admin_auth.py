@@ -27,9 +27,12 @@ from tests.conftest import (
 
 HTML = {"accept": "text/html,application/xhtml+xml"}
 
-PAGINAS = ["/admin/mupi-objects", "/admin/badges", "/admin/themes/new"]
+# Páginas com um formulário de envio (além do botão "Sair")
+PAGINAS_COM_FORMULARIO = ["/admin/mupi-objects/new", "/admin/badges", "/admin/themes"]
 
-ROTAS_JSON = ["/admin/themes", "/admin/search?name=a"]
+PAGINAS = ["/admin/mupi-objects"] + PAGINAS_COM_FORMULARIO
+
+ROTAS_JSON = ["/admin/search?name=a"]
 
 ENVIOS = {
     "/admin/themes": {"name": "Arte Deco"},
@@ -404,16 +407,17 @@ def test_token_csrf_de_outra_sessao_nao_serve(logado_sem_csrf, db_session, admin
     com_o_certo = logado_sem_csrf.post(
         "/admin/themes",
         data={"name": "Arte Deco", "csrf_token": csrf_token_for(outra_sessao)},
+        follow_redirects=False,
     )
 
     assert com_antigo.status_code == 403
-    assert com_o_certo.status_code == 200
+    assert com_o_certo.status_code == 303  # salvo: volta para a lista de temas
 
 
 def test_formularios_trazem_o_token_csrf_da_sessao(admin_client):
     token = csrf_da_sessao(admin_client)
 
-    for pagina in PAGINAS:
+    for pagina in PAGINAS_COM_FORMULARIO:
         html = admin_client.get(pagina).text
         # um no formulário da página e um no botão "Sair"
         assert html.count(f'name="csrf_token" value="{token}"') == 2, pagina

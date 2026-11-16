@@ -13,6 +13,8 @@ os.environ["AWS_REGION"] = "sa-east-1"
 os.environ["AWS_ACCESS_KEY_ID"] = "testing"
 os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
 os.environ.pop("S3_ENDPOINT_URL", None)
+# Vazio (e não ausente) para o .env do desenvolvedor não ligar a pasta local
+os.environ["LOCAL_STORAGE_DIR"] = ""
 
 import re  # noqa: E402
 from datetime import timedelta  # noqa: E402
@@ -21,7 +23,7 @@ import boto3  # noqa: E402
 import pytest  # noqa: E402
 from moto import mock_aws  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
-from sqlalchemy import create_engine  # noqa: E402
+from sqlalchemy import create_engine, event  # noqa: E402
 from sqlalchemy.orm import sessionmaker  # noqa: E402
 from sqlalchemy.pool import StaticPool  # noqa: E402
 
@@ -84,6 +86,7 @@ def s3_simulado(monkeypatch):
     monkeypatch.setattr(config, "AWS_ACCESS_KEY_ID", "testing")
     monkeypatch.setattr(config, "AWS_SECRET_ACCESS_KEY", "testing")
     monkeypatch.setattr(config, "S3_ENDPOINT_URL", None)
+    monkeypatch.setattr(config, "LOCAL_STORAGE_DIR", None)
 
     with mock_aws():
         storage_service.reset()
@@ -110,6 +113,13 @@ def db_session():
         connect_args={"check_same_thread": False},
         poolclass=StaticPool,
     )
+
+    # Como no PostgreSQL: o SQLite só respeita as chaves estrangeiras
+    # (ON DELETE CASCADE / SET NULL / RESTRICT) com esta opção ligada
+    @event.listens_for(engine, "connect")
+    def ligar_chaves_estrangeiras(conexao, _):
+        conexao.execute("PRAGMA foreign_keys=ON")
+
     # O main já importou todos os models, então todas as tabelas são criadas
     Base.metadata.create_all(bind=engine)
     TestingSession = sessionmaker(bind=engine, autocommit=False, autoflush=False)

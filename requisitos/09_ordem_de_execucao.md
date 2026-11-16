@@ -44,15 +44,16 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 - [x] **Backend:** `storage_service` com `boto3`: salvar, gerar link assinado, apagar (INF-04)
 - [x] **Backend:** script que move as imagens do banco para o S3 e migração que remove as colunas `data`/`image` (INF-04) — migrações 0006/0007; a foto do ponto já fica em `mupi_objects.photo_key` (adianta parte da PT-05)
 - [ ] **Externo:** criar o bucket de desenvolvimento e o usuário IAM; rodar `alembic upgrade 0006` → `python -m app.scripts.move_images_to_s3` → `alembic upgrade head`
+- [x] **Backend:** armazenamento numa pasta local para desenvolver sem S3 (`LOCAL_STORAGE_DIR`, links assinados em `/local-files/...`; ver `infra/arquivos_locais.md`) — 16/11. As imagens do MinIO deixaram de ser publicadas. Banco local migrado até a 0008 usando a pasta local; o bucket real continua pendente
 - [x] **App:** confirmar que o `AuthenticatedImage` funciona com link assinado completo (`https://...`) (APP-MAP-06) — já coberto por teste; nenhuma mudança necessária
 
 ## Etapa 2 — Novo modelo do ponto, painel e mapa
 
 - [x] **Backend:** vários temas por ponto — `mupi_object_themes`, migrando `theme_id` (PT-02, PT-03) — migração 0008 (16/11)
 - [x] **Backend:** blocos de texto — `mupi_object_sections`, migrando `description` (PT-04) — a `description` antiga vira o bloco "Sobre o ponto"
-- [ ] **Backend:** foto única no S3 (PT-05), vídeos do YouTube com ID extraído (PT-07), campos de estabelecimento (PT-08), "existe individualmente" (PT-09) — PT-07, 08 e 09 feitos (16/11; `mupi_object_videos`, `mupi_object_media` removida); falta substituir/remover a foto na edição (vai com o ADM-04)
+- [x] **Backend:** foto única no S3 (PT-05), vídeos do YouTube com ID extraído (PT-07), campos de estabelecimento (PT-08), "existe individualmente" (PT-09) — 16/11 (`mupi_object_videos`, `mupi_object_media` removida; substituir/remover a foto na edição do ponto)
 - [x] **Backend:** resumo do mapa, próximos e busca com `themes` (PT-10, PT-11); conteúdo completo na abertura (PT-13); remover rotas antigas de imagem/mídia (PT-14) — 16/11
-- [ ] **Backend:** painel de pontos e temas com desativar e excluir (ADM-04, ADM-05, ADM-08 e ADM-09 do ponto e do tema, ADM-12)
+- [x] **Backend:** painel de pontos e temas com desativar e excluir (ADM-04, ADM-05, ADM-08 e ADM-09 do ponto e do tema, ADM-12) — 16/11. Tema não tem "desativar" (o ADM-08 não prevê); a lista de pontos ganha áudio na Etapa 3 e rotas na Etapa 5; o formulário de insígnia continua devolvendo JSON até o ADM-06 (Etapa 4)
 - [ ] **App:** `MupiSummary` com `themes` e `MupiContent` separados (APP-MAP-01, APP-PON-01)
 - [ ] **App:** carregar todos os pontos com `GET /mupi-objects`, distância calculada no app, recarga periódica e ao voltar ao mapa (APP-MAP-02)
 - [ ] **App:** marcadores de visitado, cartão de resumo com "Abrir" e "Como chegar" (APP-MAP-03, APP-MAP-05)

@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Temas</title>
+    <link rel="stylesheet" href="/admin-static/style.css">
+</head>
+
+<body>
+
+{% include "admin/_admin_header.html" %}
+
+<div class="container container-wide">
+
+    <h1>Temas</h1>
+
+    <p>
+        Temas agrupam os pontos MUPI (ex.: Arte Deco, Modernismo) e são
+        usados nas insígnias do tipo "visitar N pontos de um tema".
+        Um ponto pode ter vários temas.
+    </p>
+
+    {% include "admin/_messages.html" %}
+
+    <h2>Cadastrar tema</h2>
+
+    <form action="/admin/themes" method="post">
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <div class="form-group">
+            <label for="name">Nome</label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                maxlength="100"
+                placeholder="Ex.: Arte Deco"
+                value="{{ draft.name }}"
+                required
+            >
+        </div>
+
+        <div class="form-group">
+            <label for="description">Descrição (opcional)</label>
+            <textarea
+                id="description"
+                name="description"
+                rows="3"
+                placeholder="Descreva o tema..."
+            >{{ draft.description }}</textarea>
+        </div>
+
+        <button type="submit">Cadastrar tema</button>
+
+    </form>
+
+    <h2>Temas cadastrados</h2>
+
+    {% if themes %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th scope="col">Nome</th>
+                    <th scope="col">Descrição</th>
+                    <th scope="col">Pontos</th>
+                    <th scope="col">Insígnias</th>
+                    <th scope="col">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for theme in themes %}
+                    <tr>
+                        <td><strong>{{ theme.name }}</strong></td>
+                        <td>{{ theme.description or "" }}</td>
+                        <td>{{ points.get(theme.id, 0) }}</td>
+                        <td>{{ badges.get(theme.id, 0) }}</td>
+                        <td class="actions">
+                            <a href="/admin/themes/{{ theme.id }}/edit">Editar</a>
+                            <a href="/admin/themes/{{ theme.id }}/delete" class="danger-link">Excluir</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Nenhum tema cadastrado ainda.</p>
+    {% endif %}
+
+</div>
+
+</body>
+
+</html>

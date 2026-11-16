@@ -6,17 +6,24 @@ Uso (na raiz do projeto, com S3_BUCKET e as credenciais no .env):
 Envia um arquivo pequeno, baixa pelo link assinado (como o app faz), confere
 que sem assinatura o arquivo NÃO é acessível (bucket privado) e apaga o arquivo.
 Serve para o bucket de desenvolvimento e, depois, para o de produção.
+
+Com a pasta local (LOCAL_STORAGE_DIR), o download passa pelo backend: ele
+precisa estar rodando (padrão http://127.0.0.1:8000; outro endereço com
+--backend-url http://127.0.0.1:8011).
 """
+import argparse
+
 import requests
 
 from app.core import config
 from app.service import storage_service
 
 TEST_KEY_PREFIX = "verificacao"
+DEFAULT_BACKEND_URL = "http://127.0.0.1:8000"
 CONTENT = b"MUPI - verificacao do armazenamento"
 
 
-def check() -> list[str]:
+def check(backend_url: str = DEFAULT_BACKEND_URL) -> list[str]:
     """Executa as verificações e devolve a lista de problemas (vazia = tudo certo)."""
     problems = []
     key = storage_service.build_key(TEST_KEY_PREFIX, "teste", "text/plain")
@@ -32,6 +39,10 @@ def check() -> list[str]:
 
     try:
         link = storage_service.url(key, expires_in=300)
+
+        # Pasta local: o link é relativo ao backend (o app completa sozinho)
+        if link.startswith("/"):
+            link = backend_url.rstrip("/") + link
         response = requests.get(link, timeout=15, allow_redirects=False)
 
         if response.status_code == 200 and response.content == CONTENT:
@@ -67,12 +78,22 @@ def check() -> list[str]:
 
 
 def main() -> None:
+    parser = argparse.ArgumentParser(description="Confere o armazenamento de arquivos.")
+    parser.add_argument(
+        "--backend-url", default=DEFAULT_BACKEND_URL,
+        help="Backend rodando, para baixar os arquivos da pasta local.",
+    )
+    args = parser.parse_args()
+
     if not storage_service.is_configured():
-        print("Erro: defina S3_BUCKET (e as credenciais da AWS) no .env.")
+        print("Erro: defina S3_BUCKET (e as credenciais da AWS) ou LOCAL_STORAGE_DIR no .env.")
         raise SystemExit(1)
 
-    print(f"Bucket: {config.S3_BUCKET} ({config.AWS_REGION})\n")
-    problems = check()
+    if storage_service.is_local():
+        print(f"Pasta local: {config.LOCAL_STORAGE_DIR} (via {args.backend_url})\n")
+    else:
+        print(f"Bucket: {config.S3_BUCKET} ({config.AWS_REGION})\n")
+    problems = check(args.backend_url)
 
     if problems:
         print("\nProblemas encontrados:")

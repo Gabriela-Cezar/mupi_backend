@@ -92,7 +92,7 @@ def move_images(conn: Connection) -> tuple[int, int]:
 
 def main() -> None:
     if not storage_service.is_configured():
-        print("Erro: defina S3_BUCKET (e as credenciais da AWS) no .env.")
+        print("Erro: defina S3_BUCKET (e as credenciais da AWS) ou LOCAL_STORAGE_DIR no .env.")
         raise SystemExit(1)
 
     if not blobs_still_in_database():

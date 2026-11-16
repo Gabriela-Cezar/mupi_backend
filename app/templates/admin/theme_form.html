@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>Cadastrar Tema</title>
+    <title>Editar tema</title>
     <link rel="stylesheet" href="/admin-static/style.css">
 </head>
 
@@ -13,22 +13,15 @@
 
 <div class="container">
 
-    <h1>Cadastrar Tema</h1>
+    <p><a href="/admin/themes">← Voltar para os temas</a></p>
 
-    <p>
-        Temas agrupam os pontos MUPI (ex.: Arte Deco, Modernismo) e são
-        usados nas insígnias do tipo "visitar N pontos de um tema".
-    </p>
+    <h1>Editar tema</h1>
 
-    <form
-        action="/admin/themes"
-        method="post"
-        enctype="multipart/form-data"
-    >
+    {% include "admin/_messages.html" %}
+
+    <form action="/admin/themes/{{ theme_id }}/edit" method="post">
 
         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-
-        <h2>Informações</h2>
 
         <div class="form-group">
             <label for="name">Nome</label>
@@ -37,47 +30,19 @@
                 id="name"
                 name="name"
                 maxlength="100"
-                placeholder="Ex.: Arte Deco"
+                value="{{ draft.name }}"
                 required
             >
         </div>
 
         <div class="form-group">
-            <label for="description">Descrição</label>
-            <textarea
-                id="description"
-                name="description"
-                rows="5"
-                placeholder="Descreva o tema..."
-            ></textarea>
+            <label for="description">Descrição (opcional)</label>
+            <textarea id="description" name="description" rows="3">{{ draft.description }}</textarea>
         </div>
 
-        <button type="submit">Cadastrar Tema</button>
+        <button type="submit">Salvar alterações</button>
 
     </form>
-
-    <h2>Temas cadastrados</h2>
-
-    {% if themes %}
-        <ul class="theme-list">
-            {% for theme in themes %}
-                <li>
-                    <strong>{{ theme.name }}</strong>
-                    {% if theme.description %}
-                        <span>{{ theme.description }}</span>
-                    {% endif %}
-                </li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        <p>Nenhum tema cadastrado ainda.</p>
-    {% endif %}
-
-    <br>
-
-    <a href="/admin/mupi-objects">Cadastrar ponto MUPI</a>
-    &nbsp;·&nbsp;
-    <a href="/admin/badges">Cadastrar insígnia</a>
 
 </div>
 

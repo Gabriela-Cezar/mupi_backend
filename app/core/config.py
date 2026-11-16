@@ -3,6 +3,7 @@
 Todo o código lê as configurações daqui, nunca direto com os.getenv (FAL-18).
 """
 import os
+from pathlib import Path
 
 from dotenv import load_dotenv
 
@@ -54,3 +55,17 @@ AWS_ACCESS_KEY_ID = _optional("AWS_ACCESS_KEY_ID")
 AWS_SECRET_ACCESS_KEY = _optional("AWS_SECRET_ACCESS_KEY")
 # Só para desenvolvimento com um S3 local (ex.: MinIO em Docker). Vazio = AWS.
 S3_ENDPOINT_URL = _optional("S3_ENDPOINT_URL")
+
+# ---------- Arquivos numa pasta local (só desenvolvimento) ----------
+# Alternativa ao S3 enquanto não há bucket: os arquivos ficam nesta pasta e o
+# próprio backend os entrega em /local-files/..., com link assinado e
+# temporário como o do S3. Caminho relativo = relativo à raiz do backend.
+# NUNCA usar em produção. Não pode ser usado junto com S3_BUCKET.
+BACKEND_DIR = Path(__file__).resolve().parents[2]
+_local_storage = _optional("LOCAL_STORAGE_DIR")
+LOCAL_STORAGE_DIR = (BACKEND_DIR / _local_storage).resolve() if _local_storage else None
+
+if S3_BUCKET and LOCAL_STORAGE_DIR:
+    raise RuntimeError(
+        "Defina S3_BUCKET ou LOCAL_STORAGE_DIR no .env, não os dois."
+    )

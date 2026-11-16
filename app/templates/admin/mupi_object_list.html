@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Pontos MUPI</title>
+    <link rel="stylesheet" href="/admin-static/style.css">
+</head>
+
+<body>
+
+{% include "admin/_admin_header.html" %}
+
+<div class="container container-wide">
+
+    <div class="page-title">
+        <h1>Pontos MUPI</h1>
+        <a class="button-link" href="/admin/mupi-objects/new">Cadastrar ponto</a>
+    </div>
+
+    {% include "admin/_messages.html" %}
+
+    {% if points %}
+        <table class="data-table">
+            <thead>
+                <tr>
+                    <th scope="col">Nome</th>
+                    <th scope="col">Situação</th>
+                    <th scope="col">Temas</th>
+                    <th scope="col">Foto</th>
+                    <th scope="col">Visitas</th>
+                    <th scope="col">Ações</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for point in points %}
+                    <tr class="{% if not point.active %}row-inactive{% endif %}">
+                        <td><strong>{{ point.name }}</strong></td>
+                        <td>
+                            {% if point.active %}
+                                <span class="tag tag-ok">Ativo</span>
+                            {% else %}
+                                <span class="tag tag-off">Desativado</span>
+                            {% endif %}
+                            {% if not point.standalone %}
+                                <span class="tag">Só em rotas</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ point.themes | map(attribute="name") | join(", ") or "—" }}</td>
+                        <td>{% if point.photo_key %}Sim{% else %}<span class="muted">Não</span>{% endif %}</td>
+                        <td>{{ visits.get(point.id, 0) }}</td>
+                        <td class="actions">
+                            <a href="/admin/mupi-objects/{{ point.id }}/edit">Editar</a>
+
+                            <form action="/admin/mupi-objects/{{ point.id }}/status" method="post" class="inline-form">
+                                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                                <input type="hidden" name="active" value="{{ 'false' if point.active else 'true' }}">
+                                <button type="submit" class="link-button">
+                                    {% if point.active %}Desativar{% else %}Ativar{% endif %}
+                                </button>
+                            </form>
+
+                            <a href="/admin/mupi-objects/{{ point.id }}/delete" class="danger-link">Excluir</a>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% else %}
+        <p>Nenhum ponto cadastrado ainda.</p>
+    {% endif %}
+
+</div>
+
+</body>
+
+</html>

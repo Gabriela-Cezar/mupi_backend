@@ -1,5 +1,9 @@
 # S3 local com MinIO (desenvolvimento)
 
+> **Atenção (nov/2025):** a MinIO deixou de publicar as imagens Docker da
+> edição comunitária e o download da imagem fixada aqui passou a ser recusado.
+> Sem uma imagem disponível, use a pasta local: `infra/arquivos_locais.md`.
+
 Permite desenvolver com fotos, imagens de insígnia e áudios sem depender do
 provedor de nuvem (AWS ou alternativa, ainda em decisão). O código é o mesmo
 de produção: o `storage_service` fala o protocolo do S3 e só muda o `.env`.

@@ -10,6 +10,8 @@ from app.controller.auth_controller import router as auth_router
 from app.controller.user_controller import router as user_router
 from app.controller.admin_auth_controller import router as admin_auth_router
 from app.controller.admin_theme_controller import router as admin_theme_router
+from app.controller.admin_mupi_object_controller import router as admin_mupi_object_router
+from app.controller.local_files_controller import router as local_files_router
 from app.controller.mupi_object_controller import (
     router as mupi_object_router,
     mupi_object_api_router
@@ -23,6 +25,7 @@ BASE_DIR = Path(__file__).resolve().parent
 
 app.include_router(admin_auth_router)
 app.include_router(admin_theme_router)
+app.include_router(admin_mupi_object_router)
 
 app.mount(
     "/admin-static",
@@ -43,3 +46,5 @@ app.include_router(email_router)
 app.include_router(auth_router)
 app.include_router(mupi_object_router)
 app.include_router(mupi_object_api_router)
+# Arquivos da pasta local (LOCAL_STORAGE_DIR, só desenvolvimento)
+app.include_router(local_files_router)

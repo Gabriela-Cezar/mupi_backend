@@ -484,3 +484,103 @@ button.danger:hover {
     border-radius: 8px;
     object-fit: cover;
 }
+
+
+/* ---------- Listas do painel (ADM-04, ADM-05) ---------- */
+
+.container-wide {
+    max-width: 1100px;
+}
+
+.page-title {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.button-link {
+    display: inline-block;
+    padding: 11px 22px;
+    border-radius: 7px;
+    background-color: #333;
+    color: #fff;
+    font-weight: 600;
+}
+
+.button-link:hover {
+    background-color: #555;
+    text-decoration: none;
+}
+
+.data-table {
+    width: 100%;
+    margin-top: 20px;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.data-table th,
+.data-table td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e3e3e3;
+    text-align: left;
+    vertical-align: top;
+}
+
+.data-table th {
+    background-color: #f4f4f4;
+    font-weight: 600;
+}
+
+.row-inactive td {
+    color: #888;
+}
+
+.actions {
+    white-space: nowrap;
+}
+
+.actions > * {
+    margin-right: 12px;
+}
+
+.actions .link-button {
+    margin-top: 0;
+    padding: 0;
+    color: #444;
+    font-size: 14px;
+    font-weight: normal;
+}
+
+.danger-link {
+    color: #b3261e;
+}
+
+.tag {
+    display: inline-block;
+    margin: 0 4px 4px 0;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background-color: #eee;
+    font-size: 12px;
+}
+
+.tag-ok {
+    background-color: #eaf7ee;
+    color: #1f6a35;
+}
+
+.tag-off {
+    background-color: #fbeaea;
+    color: #8a1f1f;
+}
+
+.muted {
+    color: #888;
+}
+
+.hint {
+    font-size: 13px;
+    color: #666;
+}

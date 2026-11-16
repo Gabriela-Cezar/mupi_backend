@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="/admin-static/style.css">
+</head>
+
+<body>
+
+{% include "admin/_admin_header.html" %}
+
+<div class="container">
+
+    <h1>{{ title }}</h1>
+
+    <p><strong>{{ item_name }}</strong></p>
+
+    {% if blockers %}
+
+        <div class="alert alert-error" role="alert">
+            <p><strong>Não é possível excluir:</strong></p>
+            <ul>
+                {% for reason in blockers %}
+                    <li>{{ reason }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+
+        {% if deactivate_action %}
+            <p>Você pode desativá-lo: ele some do app e o histórico é mantido.</p>
+
+            <form action="{{ deactivate_action }}" method="post">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <input type="hidden" name="active" value="false">
+                <button type="submit">Desativar</button>
+            </form>
+        {% endif %}
+
+    {% else %}
+
+        <p>Esta ação não pode ser desfeita.</p>
+
+        {% if consequences %}
+            <ul>
+                {% for item in consequences %}
+                    <li>{{ item }}</li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+
+        <form action="{{ delete_action }}" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <button type="submit" class="danger">Excluir definitivamente</button>
+        </form>
+
+    {% endif %}
+
+    <p><a href="{{ cancel_url }}">← Voltar sem excluir</a></p>
+
+</div>
+
+</body>
+
+</html>

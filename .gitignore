@@ -22,3 +22,6 @@ venv/
 .Rhistory
 .RData
 .Rproj.user/
+
+# Arquivos do armazenamento local (LOCAL_STORAGE_DIR, desenvolvimento)
+arquivos_locais/

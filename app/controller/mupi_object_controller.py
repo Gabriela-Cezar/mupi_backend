@@ -14,10 +14,9 @@ from fastapi import (
 )
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from starlette.datastructures import UploadFile as StarletteUploadFile
 from sqlalchemy.orm import Session
 
-from app.controller import mupi_object_form as form
+from app.controller.admin_files import commit_or_delete_file, read_image, store_file
 from app.controller.serializers import (
     mupi_load_options,
     serialize_collected,
@@ -27,7 +26,6 @@ from app.controller.serializers import (
 from app.core.admin_auth import require_admin_with_csrf
 from app.core.config import OPENROUTESERVICE_API_KEY
 from app.core.dependencies import get_current_user
-from app.core.file_types import sniff_image_mime
 from app.core.templates import templates
 from app.database.database import get_db
 from app.model.badge import Badge, BadgeRule
@@ -36,7 +34,6 @@ from app.model.mupi_object import MupiObject
 from app.model.mupi_object_badge import MupiObjectBadge  # noqa: F401  (registra a tabela de associação)
 from app.model.user import User
 from app.model.user_visit import UserVisit
-from app.service import storage_service
 from app.service.badge_service import register_visit, visit_counts
 from app.service.proximity_service import (
     bounding_box,
@@ -62,7 +59,6 @@ mupi_object_api_router = APIRouter(
     dependencies=[Depends(get_current_user)]
 )
 
-MAX_IMAGE_BYTES = 5 * 1024 * 1024
 
 
 def parse_optional_int(value: str | None, field: str) -> int | None:
@@ -79,62 +75,6 @@ def parse_optional_int(value: str | None, field: str) -> int | None:
             detail=f"Valor inválido para {field}."
         )
         
-def read_image(upload: UploadFile) -> tuple[bytes, str]:
-    data = upload.file.read(MAX_IMAGE_BYTES + 1)
-
-    if len(data) > MAX_IMAGE_BYTES:
-        raise HTTPException(
-            status_code=413,
-            detail=f"Imagem muito grande (máximo de 5 MB): {upload.filename}"
-        )
-
-    mime_type = sniff_image_mime(data)
-
-    if mime_type is None:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Formato não suportado (use PNG, JPEG ou WebP): {upload.filename}"
-        )
-
-    return data, mime_type
-
-
-def store_file(
-    db: Session, prefix: str, name: str, data: bytes, content_type: str
-) -> str:
-    """Envia o arquivo ao S3 e devolve a chave, com erro claro para o painel.
-
-    Se o envio falhar, desfaz o que estava pendente no banco.
-    """
-    key = storage_service.build_key(prefix, name, content_type)
-
-    try:
-        return storage_service.save(key, data, content_type)
-    except storage_service.StorageNotConfigured:
-        db.rollback()
-        raise HTTPException(
-            status_code=503,
-            detail="Armazenamento de arquivos não configurado (S3_BUCKET)."
-        )
-    except storage_service.StorageError:
-        db.rollback()
-        logger.exception("Erro ao enviar arquivo para o S3")
-        raise HTTPException(
-            status_code=502,
-            detail="Não foi possível salvar o arquivo. Tente novamente."
-        )
-
-
-def commit_or_delete_file(db: Session, key: str | None) -> None:
-    """Grava no banco; se falhar, apaga o arquivo recém-enviado ao S3."""
-    try:
-        db.commit()
-    except Exception:
-        db.rollback()
-        storage_service.delete_quietly(key)
-        raise
-
-
 # ---------- API do app: resumo (mapa, próximos, busca) ----------
 
 def visited_ids(db: Session, user_id: int) -> set[int]:
@@ -393,118 +333,6 @@ def admin_search_mupi_objects(
         }
         for obj in objects
     ]
-
-
-@router.get("/mupi-objects")
-def mupi_object_form(
-    request: Request,
-    db: Session = Depends(get_db)
-):
-    # Só insígnias manuais são ligadas a um ponto; as de contagem valem para todos
-    badges = (
-        db.query(Badge)
-        .filter(Badge.rule_type == BadgeRule.MANUAL)
-        .order_by(Badge.name)
-        .all()
-    )
-
-    themes = db.query(Theme).order_by(Theme.name).all()
-
-    return templates.TemplateResponse(
-        request=request,
-        name="admin/mupi_object_form.html",
-        context={
-            "badges": badges,
-            "themes": themes,
-        }
-    )
-
-
-async def uploaded_photo(request: Request) -> UploadFile | None:
-    """Foto enviada no campo "photo", ignorando o campo vazio.
-
-    Sem arquivo escolhido, o navegador envia o campo vazio, que chega como
-    texto. Declarado como UploadFile, o FastAPI recusaria o cadastro inteiro
-    com erro 422 e o ponto não seria salvo.
-    """
-    form = await request.form()
-    item = form.get("photo")
-
-    if isinstance(item, StarletteUploadFile) and item.filename:
-        return item
-
-    return None
-
-
-@router.post("/mupi-objects")
-def create_mupi_object(
-    name: str = Form(..., max_length=150),
-    latitude: float = Form(..., ge=-90, le=90),
-    longitude: float = Form(..., ge=-180, le=180),
-    active: bool = Form(False),
-    # Marcado = o ponto só aparece dentro de rotas (PT-09)
-    route_only: bool = Form(False),
-    theme_ids: list[int] = Form([]),
-    badge_ids: list[int] = Form([]),
-    section_title: list[str] = Form([]),
-    section_body: list[str] = Form([]),
-    video_url: list[str] = Form([]),
-    video_title: list[str] = Form([]),
-    address: str = Form(""),
-    opening_hours: str = Form(""),
-    accessibility: str = Form(""),
-    photo: UploadFile | None = Depends(uploaded_photo),
-    db: Session = Depends(get_db),
-):
-    name = name.strip()
-
-    if not name:
-        raise HTTPException(status_code=400, detail="Informe o nome do ponto.")
-
-    # Valida tudo antes de gravar qualquer coisa
-    themes = form.load_themes(db, theme_ids)
-    badges = form.load_point_badges(db, badge_ids)
-    sections = form.build_sections(section_title, section_body)
-    videos = form.build_videos(video_url, video_title)
-    photo_file = read_image(photo) if photo is not None else None
-
-    mupi_object = MupiObject(
-        name=name,
-        latitude=latitude,
-        longitude=longitude,
-        active=active,
-        standalone=not route_only,
-        address=form.optional_text(address, "Endereço", form.MAX_ADDRESS),
-        opening_hours=form.optional_text(
-            opening_hours, "Horário de funcionamento", form.MAX_LONG_TEXT
-        ),
-        accessibility=form.optional_text(
-            accessibility, "Acessibilidade", form.MAX_LONG_TEXT
-        ),
-        themes=themes,
-        badges=badges,
-        sections=sections,
-        videos=videos,
-    )
-
-    db.add(mupi_object)
-    # Gera o id do ponto, usado no caminho da foto no S3
-    db.flush()
-
-    if photo_file is not None:
-        photo_data, photo_mime = photo_file
-        mupi_object.photo_key = store_file(
-            db, f"points/{mupi_object.id}", "photo", photo_data, photo_mime
-        )
-
-    commit_or_delete_file(db, mupi_object.photo_key)
-
-    db.refresh(mupi_object)
-
-    return {
-        "message": "Objeto MUPI cadastrado com sucesso!",
-        "id": mupi_object.id
-    }
 
 
 @router.get("/badges")

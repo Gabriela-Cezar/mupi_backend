@@ -1,6 +1,7 @@
 from sqlalchemy import Column, ForeignKey, Integer, String, UniqueConstraint
 from sqlalchemy.orm import relationship
 
+from app.core.youtube import watch_url
 from app.database.database import Base
 
 
@@ -24,6 +25,10 @@ class MupiObjectVideo(Base):
     title = Column(String(150), nullable=True)
 
     object = relationship("MupiObject", back_populates="videos")
+
+    @property
+    def url(self) -> str:
+        return watch_url(self.youtube_id)
 
     __table_args__ = (
         UniqueConstraint(

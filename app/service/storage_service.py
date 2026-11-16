@@ -6,16 +6,31 @@ só a chave (o caminho do arquivo no bucket).
 O bucket é privado. O app recebe links temporários assinados:
 - fotos, capas e imagens de insígnia: válidos por 24 h (IMAGE_URL_SECONDS);
 - áudio: válido por 1 h, entregue só na abertura do ponto (AUDIO_URL_SECONDS).
+
+Desenvolvimento sem S3: com LOCAL_STORAGE_DIR no .env, os arquivos ficam numa
+pasta local e o backend os entrega em /local-files/<chave>?expires=&signature=
+(link relativo, assinado com a SECRET_KEY e temporário, como o do S3). Ver
+app/controller/local_files_controller.py.
 """
+import hashlib
+import hmac
+import re
 import threading
 import time
 import uuid
+from pathlib import Path
 
 import boto3
 from botocore.config import Config
 from botocore.exceptions import BotoCoreError, ClientError
 
 from app.core import config
+
+LOCAL_FILES_PATH = "/local-files"
+
+# Chave segura para virar caminho na pasta local: partes com letras, números,
+# ponto, hífen e sublinhado, sem "." nem ".." (nada de sair da pasta)
+_SAFE_KEY = re.compile(r"[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*")
 
 IMAGE_URL_SECONDS = 24 * 60 * 60
 AUDIO_URL_SECONDS = 60 * 60
@@ -48,7 +63,44 @@ _url_cache: dict[tuple[str, int], tuple[str, float]] = {}
 
 
 def is_configured() -> bool:
-    return bool(config.S3_BUCKET)
+    return bool(config.S3_BUCKET) or is_local()
+
+
+def is_local() -> bool:
+    """Arquivos numa pasta local em vez do S3 (só desenvolvimento)."""
+    return config.LOCAL_STORAGE_DIR is not None
+
+
+def local_path(key: str) -> Path:
+    """Caminho do arquivo na pasta local. ValueError se a chave não é segura."""
+    if not _SAFE_KEY.fullmatch(key):
+        raise ValueError(f"Chave inválida: {key!r}")
+
+    root = Path(config.LOCAL_STORAGE_DIR)
+    path = (root / key).resolve()
+
+    if not path.is_relative_to(root.resolve()):
+        raise ValueError(f"Chave inválida: {key!r}")
+
+    return path
+
+
+def local_signature(key: str, expires: int) -> str:
+    message = f"{key}\n{expires}".encode()
+    return hmac.new(config.SECRET_KEY.encode(), message, hashlib.sha256).hexdigest()
+
+
+def check_local_link(key: str, expires: str, signature: str) -> bool:
+    """O link local foi gerado por este servidor e ainda vale?"""
+    try:
+        expires_at = int(expires)
+    except (TypeError, ValueError):
+        return False
+
+    if expires_at < time.time():
+        return False
+
+    return hmac.compare_digest(local_signature(key, expires_at), signature or "")
 
 
 def _bucket() -> str:
@@ -109,6 +161,15 @@ def build_key(prefix: str, name: str, content_type: str) -> str:
 
 def save(key: str, data: bytes, content_type: str) -> str:
     """Envia o arquivo para o bucket e devolve a chave."""
+    if is_local():
+        try:
+            path = local_path(key)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)
+        except (OSError, ValueError) as exc:
+            raise StorageError("Não foi possível salvar o arquivo.") from exc
+        return key
+
     bucket = _bucket()
 
     try:
@@ -141,6 +202,15 @@ def url(key: str | None, expires_in: int = IMAGE_URL_SECONDS) -> str | None:
     if cached and now - cached[1] < expires_in / 2:
         return cached[0]
 
+    if is_local():
+        expires_at = int(now) + expires_in
+        link = (
+            f"{LOCAL_FILES_PATH}/{key}"
+            f"?expires={expires_at}&signature={local_signature(key, expires_at)}"
+        )
+        _url_cache[(key, expires_in)] = (link, now)
+        return link
+
     try:
         link = _s3().generate_presigned_url(
             "get_object",
@@ -159,10 +229,16 @@ def delete(key: str | None) -> None:
     if not key:
         return
 
-    try:
-        _s3().delete_object(Bucket=_bucket(), Key=key)
-    except (BotoCoreError, ClientError) as exc:
-        raise StorageError("Não foi possível apagar o arquivo.") from exc
+    if is_local():
+        try:
+            local_path(key).unlink(missing_ok=True)
+        except (OSError, ValueError) as exc:
+            raise StorageError("Não foi possível apagar o arquivo.") from exc
+    else:
+        try:
+            _s3().delete_object(Bucket=_bucket(), Key=key)
+        except (BotoCoreError, ClientError) as exc:
+            raise StorageError("Não foi possível apagar o arquivo.") from exc
 
     for cache_key in [k for k in _url_cache if k[0] == key]:
         _url_cache.pop(cache_key, None)

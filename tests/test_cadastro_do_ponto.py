@@ -1,4 +1,6 @@
 """Cadastro do ponto pelo painel com o novo modelo (PT-02 a PT-09, ADM-04)."""
+import html
+
 import pytest
 
 from app.model.badge import Badge, BadgeRule
@@ -50,12 +52,19 @@ def dados_do_ponto(**extras):
 
 
 def cadastrar_ponto(client, **extras):
-    return client.post(URL, data=dados_do_ponto(**extras))
+    return client.post(URL, data=dados_do_ponto(**extras), follow_redirects=False)
 
 
 def ponto_salvo(db_session, resposta):
+    """Cadastro deu certo: voltou para a lista e há um ponto só."""
+    assert resposta.status_code == 303, resposta.text
+    assert resposta.headers["location"] == "/admin/mupi-objects?msg=point-created"
     db_session.expire_all()
-    return db_session.get(MupiObject, resposta.json()["id"])
+    return db_session.query(MupiObject).one()
+
+
+def mensagem_de_erro(resposta) -> str:
+    return html.unescape(resposta.text)
 
 
 def nada_foi_criado(db_session):
@@ -71,7 +80,6 @@ def nada_foi_criado(db_session):
 def test_varios_temas_sao_gravados(client, db_session, tema, modernismo):
     resposta = cadastrar_ponto(client, theme_ids=[str(tema.id), str(modernismo.id)])
 
-    assert resposta.status_code == 200
     ponto = ponto_salvo(db_session, resposta)
     assert [t.name for t in ponto.themes] == ["Arte Deco", "Modernismo"]
 
@@ -85,14 +93,12 @@ def test_um_tema(client, db_session, tema):
 def test_tema_repetido_vira_um_so(client, db_session, tema):
     resposta = cadastrar_ponto(client, theme_ids=[str(tema.id), str(tema.id)])
 
-    assert resposta.status_code == 200
     assert len(ponto_salvo(db_session, resposta).themes) == 1
 
 
 def test_sem_tema_o_ponto_fica_sem_tema(client, db_session):
     resposta = cadastrar_ponto(client)
 
-    assert resposta.status_code == 200
     assert ponto_salvo(db_session, resposta).themes == []
 
 
@@ -100,14 +106,15 @@ def test_tema_inexistente_retorna_400_e_nao_cria_ponto(client, db_session, tema)
     resposta = cadastrar_ponto(client, theme_ids=[str(tema.id), "999"])
 
     assert resposta.status_code == 400
-    assert resposta.json()["detail"] == "Tema não encontrado."
+    assert "Tema não encontrado." in mensagem_de_erro(resposta)
     assert nada_foi_criado(db_session)
 
 
 def test_tema_nao_numerico_e_recusado(client, db_session):
     resposta = cadastrar_ponto(client, theme_ids="abc")
 
-    assert resposta.status_code == 422
+    assert resposta.status_code == 400
+    assert "Valor inválido para tema." in mensagem_de_erro(resposta)
     assert nada_foi_criado(db_session)
 
 
@@ -120,7 +127,6 @@ def test_blocos_sao_gravados_na_ordem_do_formulario(client, db_session):
         section_body=["Construído em 1937.", "Linha 1\r\nLinha 2"],
     )
 
-    assert resposta.status_code == 200
     blocos = ponto_salvo(db_session, resposta).sections
     assert [(b.position, b.title, b.body) for b in blocos] == [
         (0, "História", "Construído em 1937."),
@@ -149,7 +155,7 @@ def test_bloco_invalido_retorna_400_e_nao_cria_nada(client, db_session, titulo, 
     resposta = cadastrar_ponto(client, section_title=titulo, section_body=texto)
 
     assert resposta.status_code == 400
-    assert resposta.json()["detail"] == mensagem
+    assert mensagem in mensagem_de_erro(resposta)
     assert nada_foi_criado(db_session)
 
 
@@ -162,7 +168,6 @@ def test_videos_guardam_so_o_id_na_ordem(client, db_session):
         video_title=["Visita guiada", ""],
     )
 
-    assert resposta.status_code == 200
     videos = ponto_salvo(db_session, resposta).videos
     assert [(v.position, v.youtube_id, v.title) for v in videos] == [
         (0, ID, "Visita guiada"),
@@ -175,7 +180,7 @@ def test_link_que_nao_e_do_youtube_retorna_400(client, db_session, link):
     resposta = cadastrar_ponto(client, video_url=link)
 
     assert resposta.status_code == 400
-    assert resposta.json()["detail"].startswith("Link de vídeo inválido")
+    assert "Link de vídeo inválido" in mensagem_de_erro(resposta)
     assert nada_foi_criado(db_session)
 
 
@@ -230,6 +235,60 @@ def test_nome_so_com_espacos_retorna_400(client, db_session):
     resposta = cadastrar_ponto(client, name="   ")
 
     assert resposta.status_code == 400
+    assert nada_foi_criado(db_session)
+
+
+# ---------- Localização ----------
+
+def test_latitude_e_longitude_com_virgula_sao_aceitas(client, db_session):
+    resposta = cadastrar_ponto(client, latitude="-16,6869", longitude="-49,2648")
+
+    ponto = ponto_salvo(db_session, resposta)
+    assert (ponto.latitude, ponto.longitude) == (-16.6869, -49.2648)
+
+
+@pytest.mark.parametrize("campo, valor, mensagem", [
+    ("latitude", "", "Informe a latitude."),
+    ("latitude", "abc", "Latitude inválida: abc"),
+    ("latitude", "91", "A latitude deve estar entre -90 e 90."),
+    ("longitude", "-181", "A longitude deve estar entre -180 e 180."),
+    ("longitude", "nan", "A longitude deve estar entre -180 e 180."),
+])
+def test_localizacao_invalida_retorna_400(client, db_session, campo, valor, mensagem):
+    resposta = cadastrar_ponto(client, **{campo: valor})
+
+    assert resposta.status_code == 400
+    assert mensagem in mensagem_de_erro(resposta)
+    assert nada_foi_criado(db_session)
+
+
+# ---------- Erro: o formulário volta preenchido (ADM-12) ----------
+
+def test_erro_mostra_o_formulario_com_o_que_foi_digitado(client, db_session, tema):
+    resposta = cadastrar_ponto(
+        client,
+        name="Meu ponto",
+        theme_ids=str(tema.id),
+        section_title="História",
+        section_body="Texto do bloco",
+        video_url="https://vimeo.com/1",
+        video_title="Meu vídeo",
+        address="Rua 1",
+        route_only="true",
+    )
+
+    assert resposta.status_code == 400
+    assert "text/html" in resposta.headers["content-type"]
+    pagina = resposta.text
+    assert 'class="alert alert-error"' in pagina
+    assert 'value="Meu ponto"' in pagina
+    assert f'value="{tema.id}"\n                                checked' in pagina.replace("\r", "")
+    assert 'value="História"' in pagina
+    assert "Texto do bloco</textarea>" in pagina
+    assert 'value="https://vimeo.com/1"' in pagina
+    assert 'value="Meu vídeo"' in pagina
+    assert 'value="Rua 1"' in pagina
+    assert 'name="route_only"\n                    value="true"\n                    checked' in pagina
     assert nada_foi_criado(db_session)
 
 

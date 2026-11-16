@@ -3,7 +3,7 @@
 
 <head>
     <meta charset="UTF-8">
-    <title>{% if point %}Editar{% else %}Cadastrar{% endif %} ponto MUPI</title>
+    <title>{% if editing %}Editar{% else %}Cadastrar{% endif %} ponto MUPI</title>
 
     <link
         rel="stylesheet"
@@ -15,15 +15,19 @@
 
 {% include "admin/_admin_header.html" %}
 
-{% set selected_themes = point.themes | map(attribute="id") | list if point else [] %}
-{% set selected_badges = point.badges | map(attribute="id") | list if point else [] %}
+{% set selected_themes = point.themes | map(attribute="id") | list %}
+{% set selected_badges = point.badges | map(attribute="id") | list %}
 
 <div class="container">
 
-    <h1>{% if point %}Editar ponto MUPI{% else %}Cadastrar ponto MUPI{% endif %}</h1>
+    <p><a href="/admin/mupi-objects">← Voltar para a lista</a></p>
+
+    <h1>{% if editing %}Editar ponto MUPI{% else %}Cadastrar ponto MUPI{% endif %}</h1>
+
+    {% include "admin/_messages.html" %}
 
     <form
-        action="{{ form_action | default('/admin/mupi-objects') }}"
+        action="{{ form_action }}"
         method="post"
         enctype="multipart/form-data"
     >
@@ -41,7 +45,7 @@
                 name="name"
                 maxlength="150"
                 placeholder="Nome do ponto MUPI"
-                value="{{ point.name if point else '' }}"
+                value="{{ point.name }}"
                 required
             >
         </div>
@@ -74,12 +78,13 @@
         <div class="form-group">
             <label for="latitude">Latitude</label>
             <input
-                type="number"
+                type="text"
+                inputmode="decimal"
                 id="latitude"
                 name="latitude"
                 step="any"
                 placeholder="Ex.: -16.6869"
-                value="{{ point.latitude if point else '' }}"
+                value="{{ point.latitude }}"
                 required
             >
         </div>
@@ -87,12 +92,13 @@
         <div class="form-group">
             <label for="longitude">Longitude</label>
             <input
-                type="number"
+                type="text"
+                inputmode="decimal"
                 id="longitude"
                 name="longitude"
                 step="any"
                 placeholder="Ex.: -49.2648"
-                value="{{ point.longitude if point else '' }}"
+                value="{{ point.longitude }}"
                 required
             >
         </div>
@@ -106,7 +112,7 @@
                     type="checkbox"
                     name="active"
                     value="true"
-                    {% if not point or point.active %}checked{% endif %}
+                    {% if point.active %}checked{% endif %}
                 >
                 Ponto ativo (aparece no app)
             </label>
@@ -116,7 +122,7 @@
                     type="checkbox"
                     name="route_only"
                     value="true"
-                    {% if point and not point.standalone %}checked{% endif %}
+                    {% if not point.standalone %}checked{% endif %}
                 >
                 Só aparece dentro de rotas (fica fora do mapa e da busca)
             </label>
@@ -131,7 +137,7 @@
         </p>
 
         <div id="sections" class="repeat-list">
-            {% for section in (point.sections if point else []) %}
+            {% for section in point.sections %}
                 <div class="repeat-item">
                     <div class="form-group">
                         <label>Título</label>
@@ -156,12 +162,12 @@
         <h2>Foto</h2>
 
         <div class="form-group">
-            {% if point and photo_url %}
+            {% if photo_url %}
                 <img src="{{ photo_url }}" alt="Foto atual do ponto" class="photo-preview">
             {% endif %}
 
             <label for="photo">
-                {% if point and point.photo_key %}Substituir a foto{% else %}Foto do ponto{% endif %}
+                {% if point.photo_key %}Substituir a foto{% else %}Foto do ponto{% endif %}
                 (PNG, JPEG ou WebP, até 5 MB). Aparece no mapa.
             </label>
 
@@ -172,7 +178,11 @@
                 accept="image/png,image/jpeg,image/webp"
             >
 
-            {% if point and point.photo_key %}
+            {% if error and not editing %}
+                <p class="hint">Se você tinha escolhido uma foto, escolha de novo.</p>
+            {% endif %}
+
+            {% if point.photo_key %}
                 <label>
                     <input type="checkbox" name="remove_photo" value="true">
                     Remover a foto atual
@@ -189,11 +199,11 @@
         </p>
 
         <div id="videos" class="repeat-list">
-            {% for video in (point.videos if point else []) %}
+            {% for video in point.videos %}
                 <div class="repeat-item">
                     <div class="form-group">
                         <label>Link</label>
-                        <input type="url" name="video_url" value="https://www.youtube.com/watch?v={{ video.youtube_id }}">
+                        <input type="text" name="video_url" value="{{ video.url }}">
                     </div>
                     <div class="form-group">
                         <label>Título (opcional)</label>
@@ -217,17 +227,17 @@
 
         <div class="form-group">
             <label for="address">Endereço</label>
-            <input type="text" id="address" name="address" maxlength="300" value="{{ point.address or '' if point else '' }}">
+            <input type="text" id="address" name="address" maxlength="300" value="{{ point.address }}">
         </div>
 
         <div class="form-group">
             <label for="opening_hours">Horário de funcionamento</label>
-            <textarea id="opening_hours" name="opening_hours" rows="3">{{ point.opening_hours or '' if point else '' }}</textarea>
+            <textarea id="opening_hours" name="opening_hours" rows="3">{{ point.opening_hours }}</textarea>
         </div>
 
         <div class="form-group">
             <label for="accessibility">Informações de acessibilidade</label>
-            <textarea id="accessibility" name="accessibility" rows="3">{{ point.accessibility or '' if point else '' }}</textarea>
+            <textarea id="accessibility" name="accessibility" rows="3">{{ point.accessibility }}</textarea>
         </div>
 
 
@@ -260,7 +270,7 @@
 
 
         <button type="submit">
-            {% if point %}Salvar alterações{% else %}Cadastrar ponto{% endif %}
+            {% if editing %}Salvar alterações{% else %}Cadastrar ponto{% endif %}
         </button>
 
     </form>
@@ -290,7 +300,7 @@
     <div class="repeat-item">
         <div class="form-group">
             <label>Link</label>
-            <input type="url" name="video_url" placeholder="https://youtu.be/...">
+            <input type="text" name="video_url" placeholder="https://youtu.be/...">
         </div>
         <div class="form-group">
             <label>Título (opcional)</label>
