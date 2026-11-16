@@ -54,18 +54,18 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 - [x] **Backend:** foto única no S3 (PT-05), vídeos do YouTube com ID extraído (PT-07), campos de estabelecimento (PT-08), "existe individualmente" (PT-09) — 16/11 (`mupi_object_videos`, `mupi_object_media` removida; substituir/remover a foto na edição do ponto)
 - [x] **Backend:** resumo do mapa, próximos e busca com `themes` (PT-10, PT-11); conteúdo completo na abertura (PT-13); remover rotas antigas de imagem/mídia (PT-14) — 16/11
 - [x] **Backend:** painel de pontos e temas com desativar e excluir (ADM-04, ADM-05, ADM-08 e ADM-09 do ponto e do tema, ADM-12) — 16/11. Tema não tem "desativar" (o ADM-08 não prevê); a lista de pontos ganha áudio na Etapa 3 e rotas na Etapa 5; o formulário de insígnia continua devolvendo JSON até o ADM-06 (Etapa 4)
-- [ ] **App:** `MupiSummary` com `themes` e `MupiContent` separados (APP-MAP-01, APP-PON-01)
-- [ ] **App:** carregar todos os pontos com `GET /mupi-objects`, distância calculada no app, recarga periódica e ao voltar ao mapa (APP-MAP-02)
-- [ ] **App:** marcadores de visitado, cartão de resumo com "Abrir" e "Como chegar" (APP-MAP-03, APP-MAP-05)
-- [ ] **App:** menu, busca e "Abrir ponto" no aviso de chegada (APP-MAP-07, 08, 09)
-- [ ] **App:** tela inteira do ponto — foto única, blocos com título em negrito, estabelecimento (APP-PON-02, 03, 07, 08)
+- [x] **App:** `MupiSummary` com `themes` e `MupiContent` separados (APP-MAP-01, APP-PON-01) — 16/11; `MupiObject` removido
+- [x] **App:** carregar todos os pontos com `GET /mupi-objects`, distância calculada no app, recarga periódica e ao voltar ao mapa (APP-MAP-02) — 16/11; recarga a cada 3 min, ao voltar da busca e ao voltar ao app; `getNearby` removido do app (a rota `/nearby` continua no backend)
+- [x] **App:** marcadores de visitado, cartão de resumo com "Abrir" e "Como chegar" (APP-MAP-03, APP-MAP-05) — 16/11. O ponto só abre ao tocar em "Abrir" (nunca sozinho); longe, o botão mostra "Aproxime-se para abrir (X m)". Raio de 50 m fixo no app até o backend informar o valor (Etapa 3)
+- [x] **App:** menu, busca e "Abrir ponto" no aviso de chegada (APP-MAP-07, 08, 09) — 16/11. Selo de visitado no menu e na busca; o menu espera a localização para mostrar os mais próximos; "Abrir ponto" mostra o cartão (o conteúdo abre só no "Abrir")
+- [x] **App:** tela inteira do ponto — foto única, blocos com título em negrito, estabelecimento (APP-PON-02, 03, 07, 08) — 16/11. Foto em tela cheia com zoom e endereço abrindo o app de mapas (desejáveis); os vídeos ainda abrem no YouTube até a APP-PON-06 (Etapa 3)
 
 ## Etapa 3 — Mídia e proximidade
 
 - [ ] **Backend:** áudio com validação pelo conteúdo e duração (PT-06)
-- [ ] **Backend:** abertura recebe a precisão do GPS; distância máxima no `.env` com tolerância (VIS-01, VIS-02)
-- [ ] **Backend:** gravar latitude, longitude e precisão na visita (VIS-03); teste de concorrência (VIS-05)
-- [ ] **Backend:** devolver a distância máxima ao app (para o botão "Abrir" não repetir o valor)
+- [x] **Backend:** abertura recebe a precisão do GPS; distância máxima no `.env` com tolerância (VIS-01, VIS-02) — 16/11. `VISIT_MAX_DISTANCE_M` (padrão 25 m) e `VISIT_GPS_TOLERANCE_M` (padrão 15 m); `accuracy` opcional na abertura
+- [x] **Backend:** gravar latitude, longitude e precisão na visita (VIS-03); teste de concorrência (VIS-05) — 16/11, migração 0009
+- [x] **Backend:** devolver a distância máxima ao app (para o botão "Abrir" não repetir o valor) — 16/11, `GET /app-settings`
 - [ ] **App:** leitura em voz alta com `flutter_tts` (APP-PON-04)
 - [ ] **App:** áudio com `just_audio` (APP-PON-05)
 - [ ] **App:** YouTube dentro do app com `youtube_player_flutter` (APP-PON-06)

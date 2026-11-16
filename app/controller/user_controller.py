@@ -29,6 +29,9 @@ class CheckInRequest(BaseModel):
     object_id: int
     latitude: float = Field(ge=-90, le=90)
     longitude: float = Field(ge=-180, le=180)
+    # Precisão do GPS em metros, informada pelo celular (VIS-01). Opcional:
+    # sem ela, vale só a distância máxima, sem tolerância.
+    accuracy: float | None = Field(default=None, ge=0, le=100_000)
 
 
 class CollectBadgeRequest(CheckInRequest):
@@ -118,10 +121,14 @@ def check_in(
 ):
     user_id = user.id
 
-    mupi = get_mupi_in_range(db, data.object_id, data.latitude, data.longitude)
+    mupi = get_mupi_in_range(
+        db, data.object_id, data.latitude, data.longitude, data.accuracy
+    )
 
     try:
-        new_visit, awarded = register_visit(db, user_id, mupi)
+        new_visit, awarded = register_visit(
+            db, user_id, mupi, data.latitude, data.longitude, data.accuracy
+        )
         db.commit()
     except IntegrityError:
         db.rollback()
@@ -144,7 +151,9 @@ def collect_badge(
 ):
     user_id = user.id
 
-    mupi = get_mupi_in_range(db, data.object_id, data.latitude, data.longitude)
+    mupi = get_mupi_in_range(
+        db, data.object_id, data.latitude, data.longitude, data.accuracy
+    )
 
     badge = (
         db.query(Badge)

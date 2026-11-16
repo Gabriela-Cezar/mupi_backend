@@ -3,13 +3,10 @@ import math
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.core import config
 from app.model.mupi_object import MupiObject
 
 EARTH_RADIUS_M = 6_371_000
-
-# Distância máxima para abrir um ponto e registrar a visita.
-# Será configurável e ajustada no beta (VIS-02).
-PROXIMITY_RADIUS_M = 50
 
 
 def haversine_m(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
@@ -61,23 +58,50 @@ def get_active_mupi(db: Session, object_id: int, options=()) -> MupiObject:
     return mupi
 
 
+def max_distance() -> float:
+    """Distância máxima para abrir um ponto, em metros (VIS-02, no .env)."""
+    return config.VISIT_MAX_DISTANCE_M
+
+
+def gps_tolerance() -> float:
+    """Quanto da precisão do GPS pode ser somado à distância máxima."""
+    return config.VISIT_GPS_TOLERANCE_M
+
+
+def allowed_distance(accuracy: float | None) -> float:
+    """Distância aceita para quem informou esta precisão do GPS (VIS-02).
+
+    Soma à distância máxima a precisão do celular, até a tolerância: um GPS
+    com erro de 10 m não impede quem está realmente no local, e um GPS ruim
+    (erro de 200 m) não libera o ponto de longe.
+    """
+    tolerance = min(max(accuracy or 0, 0), gps_tolerance())
+    return max_distance() + tolerance
+
+
+def _meters(value: float) -> str:
+    return f"{value:.0f}"
+
+
 def get_mupi_in_range(
     db: Session,
     object_id: int,
     latitude: float,
     longitude: float,
+    accuracy: float | None = None,
     options=()
 ) -> MupiObject:
+    """Ponto ativo, se o usuário estiver perto dele; senão 404 ou 403 (VIS-01)."""
     mupi = get_active_mupi(db, object_id, options)
 
     distance = haversine_m(latitude, longitude, mupi.latitude, mupi.longitude)
 
-    if distance > PROXIMITY_RADIUS_M:
+    if distance > allowed_distance(accuracy):
         raise HTTPException(
             status_code=403,
             detail=(
-                f"Aproxime-se do MUPI (você está a {round(distance)} m; "
-                f"o limite é {PROXIMITY_RADIUS_M} m)."
+                f"Aproxime-se do MUPI (você está a {_meters(distance)} m; "
+                f"o limite é {_meters(max_distance())} m)."
             )
         )
 

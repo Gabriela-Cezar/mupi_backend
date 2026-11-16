@@ -1,4 +1,4 @@
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, func
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Index, Integer, func
 
 from app.database.database import Base
 
@@ -23,6 +23,14 @@ class UserVisit(Base):
         server_default=func.now(),
         nullable=False
     )
+
+    # Onde o usuário estava ao registrar a visita (VIS-03): para análise de
+    # fraude e para ajustar a distância máxima no beta. Nulos nas visitas
+    # anteriores à migração 0009.
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    # Precisão do GPS informada pelo celular, em metros (nula se não veio)
+    accuracy = Column(Float, nullable=True)
 
     __table_args__ = (
         Index("ix_user_visits_object_id", "object_id"),

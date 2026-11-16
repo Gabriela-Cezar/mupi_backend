@@ -95,16 +95,26 @@ def award_visit_badges(
 def register_visit(
     db: Session,
     user_id: int,
-    mupi: MupiObject
+    mupi: MupiObject,
+    latitude: float | None = None,
+    longitude: float | None = None,
+    accuracy: float | None = None,
 ) -> tuple[bool, list[UserBadge]]:
     """Registra a visita (uma por usuário e MUPI) e avalia as condições.
 
-    Devolve (visita_nova, insígnias_conquistadas). Não faz commit.
+    Guarda onde o usuário estava e a precisão do GPS (VIS-03). Devolve
+    (visita_nova, insígnias_conquistadas). Não faz commit.
     """
     if db.get(UserVisit, (user_id, mupi.id)) is not None:
         return False, []
 
-    db.add(UserVisit(user_id=user_id, object_id=mupi.id))
+    db.add(UserVisit(
+        user_id=user_id,
+        object_id=mupi.id,
+        latitude=latitude,
+        longitude=longitude,
+        accuracy=accuracy,
+    ))
 
     db.flush()
 

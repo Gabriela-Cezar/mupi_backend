@@ -15,6 +15,9 @@ os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
 os.environ.pop("S3_ENDPOINT_URL", None)
 # Vazio (e não ausente) para o .env do desenvolvedor não ligar a pasta local
 os.environ["LOCAL_STORAGE_DIR"] = ""
+# Regra de distância da abertura (VIS-02) fixa nos testes, independente do .env
+os.environ["VISIT_MAX_DISTANCE_M"] = "25"
+os.environ["VISIT_GPS_TOLERANCE_M"] = "15"
 
 import re  # noqa: E402
 from datetime import timedelta  # noqa: E402

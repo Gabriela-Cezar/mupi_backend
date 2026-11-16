@@ -224,11 +224,15 @@ def test_desfazer_a_0003_volta_a_apagar_em_cascata(tmp_path):
             "INSERT INTO mupi_objects (name, latitude, longitude) VALUES ('Ponto', -16.68, -49.25)"
         ))
         ponto_id = db.execute(text("SELECT id FROM mupi_objects")).scalar_one()
-        db.add(UserVisit(user_id=usuario_id, object_id=ponto_id))
+        # A visita também: o model atual tem a posição (migração 0009)
+        db.execute(
+            text("INSERT INTO user_visits (user_id, object_id) VALUES (:u, :p)"),
+            {"u": usuario_id, "p": ponto_id},
+        )
         db.commit()
 
         db.execute(text("DELETE FROM mupi_objects WHERE id = :id"), {"id": ponto_id})
         db.commit()
 
-        assert contar(db, UserVisit) == 0
+        assert db.execute(text("SELECT COUNT(*) FROM user_visits")).scalar() == 0
     engine.dispose()

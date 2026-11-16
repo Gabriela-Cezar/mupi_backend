@@ -22,6 +22,23 @@ def _optional(name: str) -> str | None:
     return value or None
 
 
+def _positive_float(name: str, default: float) -> float:
+    value = _optional(name)
+
+    if value is None:
+        return default
+
+    try:
+        number = float(value.replace(",", "."))
+    except ValueError:
+        raise RuntimeError(f"{name} deve ser um número (metros): {value!r}")
+
+    if number <= 0:
+        raise RuntimeError(f"{name} deve ser maior que zero: {value!r}")
+
+    return number
+
+
 DATABASE_URL = _require("DATABASE_URL")
 RESEND_API_KEY = _require("RESEND_API_KEY")
 EMAIL_FROM = _require("EMAIL_FROM")
@@ -42,6 +59,15 @@ CORS_ALLOWED_ORIGIN_REGEX = os.getenv("CORS_ALLOWED_ORIGIN_REGEX") or None
 # (botão "Como chegar"). Opcional: sem ela o servidor sobe normalmente,
 # e só essa rota responde com erro explicando que falta a chave.
 OPENROUTESERVICE_API_KEY = _optional("OPENROUTESERVICE_API_KEY")
+
+# ---------- Abertura do ponto (VIS-02) ----------
+# Distância máxima, em metros, entre o usuário e o ponto para abrir o conteúdo
+# e registrar a visita. Vale para todos os pontos; ajustar durante o beta.
+VISIT_MAX_DISTANCE_M = _positive_float("VISIT_MAX_DISTANCE_M", 25)
+# Tolerância ao erro do GPS: soma-se a precisão informada pelo celular, até
+# este limite. Ex.: limite 25 m, precisão 10 m → abre a até 35 m; precisão
+# 40 m → abre a até 25 + 15 = 40 m.
+VISIT_GPS_TOLERANCE_M = _positive_float("VISIT_GPS_TOLERANCE_M", 15)
 
 # ---------- Arquivos (fotos, áudios, imagens de insígnia) no Amazon S3 (INF-04) ----------
 # Opcional: sem S3_BUCKET o servidor sobe normalmente, mas o painel recusa o

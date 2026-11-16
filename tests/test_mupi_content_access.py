@@ -14,7 +14,7 @@ from app.model.user_badge import UserBadge
 from app.model.user_visit import UserVisit
 from app.core import config
 from app.service import storage_service
-from app.service.proximity_service import PROXIMITY_RADIUS_M
+from app.service.proximity_service import max_distance
 
 FOTO = "points/1/photo-abc.png"
 FOTO_INATIVO = "points/2/photo-def.png"
@@ -319,7 +319,7 @@ def test_abrir_longe_retorna_403_sem_conteudo_e_sem_visita(user_client, db_sessi
 
     assert resposta.status_code == 403
     assert "Aproxime-se do MUPI" in resposta.json()["detail"]
-    assert f"o limite é {PROXIMITY_RADIUS_M} m" in resposta.json()["detail"]
+    assert f"o limite é {max_distance():.0f} m" in resposta.json()["detail"]
     assert "Texto que só aparece perto" not in resposta.text
     assert db_session.query(UserVisit).count() == 0
 
@@ -391,14 +391,14 @@ def test_abrir_concede_insignia_de_contagem(user_client, db_session, usuario, po
 
 def test_abrir_um_pouco_dentro_do_limite_funciona(user_client, ponto):
     # ~0,9 do limite ao norte (1 grau de latitude ≈ 111 km)
-    deslocamento = PROXIMITY_RADIUS_M * 0.9 / 111_195
+    deslocamento = max_distance() * 0.9 / 111_195
     resposta = abrir(user_client, ponto, {"latitude": LAT + deslocamento, "longitude": LNG})
 
     assert resposta.status_code == 200
 
 
 def test_abrir_um_pouco_fora_do_limite_e_recusado(user_client, ponto):
-    deslocamento = PROXIMITY_RADIUS_M * 1.1 / 111_195
+    deslocamento = max_distance() * 1.1 / 111_195
     resposta = abrir(user_client, ponto, {"latitude": LAT + deslocamento, "longitude": LNG})
 
     assert resposta.status_code == 403
