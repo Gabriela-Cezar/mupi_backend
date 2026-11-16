@@ -13,6 +13,7 @@ edição mostra o erro e o botão "Recalcular trajeto".
 """
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import RedirectResponse
+from sqlalchemy import distinct, func
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
@@ -40,6 +41,7 @@ from app.database.database import get_db
 from app.model.mupi_object import MupiObject
 from app.model.route import Route, RoutePoint
 from app.model.theme import Theme
+from app.model.user_route_completion import UserRouteCompletion
 from app.service import storage_service
 from app.service.route_path_service import update_route_path
 
@@ -330,9 +332,21 @@ async def set_route_status(route_id: int, request: Request, db: Session = Depend
 # ---------- Excluir (ADM-09) ----------
 
 def delete_blockers(db: Session, route: Route) -> list[str]:
-    """Rota concluída por alguém ou com insígnia não pode ser excluída. As
-    conclusões e a insígnia de rota entram nos próximos passos da Etapa 5;
-    por enquanto, nada bloqueia."""
+    """Rota concluída por alguém não pode ser excluída: a conclusão fica no
+    histórico do usuário (ADM-09). O painel oferece desativar. A insígnia de
+    rota entra no passo 4 da Etapa 5. Vazio = pode excluir."""
+    users = (
+        db.query(func.count(distinct(UserRouteCompletion.user_id)))
+        .filter(UserRouteCompletion.route_id == route.id)
+        .scalar()
+    ) or 0
+
+    if users == 1:
+        return ["1 usuário já concluiu esta rota."]
+
+    if users:
+        return [f"{users} usuários já concluíram esta rota."]
+
     return []
 
 
