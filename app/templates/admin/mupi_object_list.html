@@ -28,6 +28,7 @@
                     <th scope="col">Situação</th>
                     <th scope="col">Temas</th>
                     <th scope="col">Foto</th>
+                    <th scope="col">Áudio</th>
                     <th scope="col">Visitas</th>
                     <th scope="col">Ações</th>
                 </tr>
@@ -48,6 +49,7 @@
                         </td>
                         <td>{{ point.themes | map(attribute="name") | join(", ") or "—" }}</td>
                         <td>{% if point.photo_key %}Sim{% else %}<span class="muted">Não</span>{% endif %}</td>
+                        <td>{% if point.audio_key %}{{ point.audio_duration | duration }}{% else %}<span class="muted">Não</span>{% endif %}</td>
                         <td>{{ visits.get(point.id, 0) }}</td>
                         <td class="actions">
                             <a href="/admin/mupi-objects/{{ point.id }}/edit">Editar</a>

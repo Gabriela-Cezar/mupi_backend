@@ -58,6 +58,15 @@ class MupiObject(Base):
         nullable=True
     )
 
+    # Áudio do ponto no S3 (PT-06): no máximo um, opcional. MP3 ou M4A.
+    audio_key = Column(
+        String(300),
+        nullable=True
+    )
+
+    # Duração do áudio em segundos, para o app mostrar antes de tocar
+    audio_duration = Column(Integer, nullable=True)
+
     # Informações de estabelecimento (PT-08), todas opcionais
     address = Column(String(300), nullable=True)
 

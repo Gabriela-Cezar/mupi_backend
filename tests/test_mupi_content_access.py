@@ -26,9 +26,11 @@ LONGE = {"latitude": LAT - 0.01, "longitude": LNG}  # ~1,1 km ao sul
 
 CAMPOS_DO_RESUMO = {
     "id", "name", "latitude", "longitude", "themes", "photo_url", "has_video",
-    "address", "visited",
+    "has_audio", "address", "visited",
 }
-CAMPOS_DO_CONTEUDO = {"sections", "videos", "opening_hours", "accessibility", "badges"}
+CAMPOS_DO_CONTEUDO = {
+    "sections", "videos", "audio", "opening_hours", "accessibility", "badges",
+}
 
 VIDEO_ID = "dQw4w9WgXcQ"
 
@@ -177,6 +179,7 @@ def test_lista_traz_so_o_resumo(user_client, ponto):
         "longitude": LNG,
         "themes": [{"id": ponto.themes[0].id, "name": "Arte Deco"}],
         "has_video": True,
+        "has_audio": False,
         "address": "Rua 1, 100 - Centro",
         "visited": False,
     }

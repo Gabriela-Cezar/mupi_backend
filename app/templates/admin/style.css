@@ -485,6 +485,13 @@ button.danger:hover {
     object-fit: cover;
 }
 
+.audio-preview {
+    display: block;
+    width: 100%;
+    max-width: 420px;
+    margin-bottom: 6px;
+}
+
 
 /* ---------- Listas do painel (ADM-04, ADM-05) ---------- */
 

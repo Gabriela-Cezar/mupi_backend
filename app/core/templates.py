@@ -22,3 +22,14 @@ templates = Jinja2Templates(
     directory=TEMPLATES_DIR,
     context_processors=[_admin_context]
 )
+
+
+def format_duration(seconds: int | None) -> str:
+    """Duração em "m:ss" (ex.: 125 → "2:05"); "—" se não houver."""
+    if seconds is None:
+        return "—"
+    minutes, rest = divmod(int(seconds), 60)
+    return f"{minutes}:{rest:02d}"
+
+
+templates.env.filters["duration"] = format_duration

@@ -57,8 +57,11 @@ class PointDraft:
     opening_hours: str = ""
     accessibility: str = ""
     remove_photo: bool = False
-    # Na edição, a foto atual continua aparecendo
+    remove_audio: bool = False
+    # Na edição, a foto e o áudio atuais continuam aparecendo
     photo_key: str | None = None
+    audio_key: str | None = None
+    audio_duration: int | None = None
 
     # O template marca temas e insígnias por `.id`
     @property
@@ -120,6 +123,7 @@ def read_point_form(form: FormData) -> PointDraft:
         opening_hours=_text(form, "opening_hours"),
         accessibility=_text(form, "accessibility"),
         remove_photo=_checked(form, "remove_photo"),
+        remove_audio=_checked(form, "remove_audio"),
     )
 
 
@@ -139,6 +143,8 @@ def draft_from_point(point: MupiObject) -> PointDraft:
         opening_hours=point.opening_hours or "",
         accessibility=point.accessibility or "",
         photo_key=point.photo_key,
+        audio_key=point.audio_key,
+        audio_duration=point.audio_duration,
     )
 
 

@@ -16,7 +16,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session, selectinload
 
 from app.controller.admin_files import (
-    commit_or_delete_file,
+    commit_or_delete_files,
+    read_audio,
     read_image,
     store_file,
     uploaded_file,
@@ -114,6 +115,9 @@ def _render_form(
             "editing": point_id is not None,
             "form_action": f"{LIST_URL}/{point_id}/edit" if point_id else LIST_URL,
             "photo_url": storage_service.url(draft.photo_key),
+            "audio_url": storage_service.url(
+                draft.audio_key, storage_service.AUDIO_URL_SECONDS
+            ),
             "themes": db.query(Theme).order_by(Theme.name).all(),
             "badges": badges,
             "error": error,
@@ -134,6 +138,50 @@ async def _read_photo(request: Request) -> tuple[bytes, str] | None:
         raise FormError(exc.detail, exc.status_code)
 
 
+async def _read_audio(request: Request) -> tuple[bytes, str, int] | None:
+    audio = await uploaded_file(request, "audio")
+
+    if audio is None:
+        return None
+
+    try:
+        return read_audio(audio)
+    except HTTPException as exc:
+        raise FormError(exc.detail, exc.status_code)
+
+
+def _store_files(
+    db: Session,
+    point: MupiObject,
+    photo: tuple[bytes, str] | None,
+    audio: tuple[bytes, str, int] | None,
+) -> list[str]:
+    """Envia a foto e o áudio novos ao S3 e guarda as chaves no ponto.
+
+    Devolve as chaves enviadas. Se um envio falhar, apaga o que já tinha ido
+    (store_file desfaz o banco) e repassa o erro.
+    """
+    sent: list[str] = []
+    prefix = f"points/{point.id}"
+
+    try:
+        if photo is not None:
+            point.photo_key = store_file(db, prefix, "photo", *photo)
+            sent.append(point.photo_key)
+
+        if audio is not None:
+            data, mime_type, duration = audio
+            point.audio_key = store_file(db, prefix, "audio", data, mime_type)
+            point.audio_duration = duration
+            sent.append(point.audio_key)
+    except HTTPException:
+        for key in sent:
+            storage_service.delete_quietly(key)
+        raise
+
+    return sent
+
+
 @router.get("/new")
 def new_point_form(request: Request, db: Session = Depends(get_db)):
     return _render_form(request, db, PointDraft())
@@ -146,25 +194,25 @@ async def create_point(request: Request, db: Session = Depends(get_db)):
     try:
         data = validate_point(db, draft)
         photo = await _read_photo(request)
+        audio = await _read_audio(request)
     except FormError as exc:
         return _render_form(request, db, draft, error=exc.message, status_code=exc.status_code)
 
     point = MupiObject()
     apply_point(point, data)
     db.add(point)
-    # Gera o id do ponto, usado no caminho da foto no S3
+    # Gera o id do ponto, usado no caminho dos arquivos no S3
     db.flush()
 
-    if photo is not None:
-        try:
-            point.photo_key = store_file(db, f"points/{point.id}", "photo", *photo)
-        except HTTPException as exc:
-            # store_file já desfez o que estava pendente no banco
-            return _render_form(
-                request, db, draft, error=exc.detail, status_code=exc.status_code
-            )
+    try:
+        sent = _store_files(db, point, photo, audio)
+    except HTTPException as exc:
+        # store_file já desfez o que estava pendente no banco
+        return _render_form(
+            request, db, draft, error=exc.detail, status_code=exc.status_code
+        )
 
-    commit_or_delete_file(db, point.photo_key)
+    commit_or_delete_files(db, sent)
 
     return _redirect("point-created")
 
@@ -181,38 +229,43 @@ async def update_point(point_id: int, request: Request, db: Session = Depends(ge
     point = _get_point(db, point_id)
     draft = read_point_form(await request.form())
     draft.photo_key = point.photo_key
+    draft.audio_key = point.audio_key
+    draft.audio_duration = point.audio_duration
 
     try:
         data = validate_point(db, draft)
         photo = await _read_photo(request)
+        audio = await _read_audio(request)
     except FormError as exc:
         return _render_form(
             request, db, draft, point_id=point.id,
             error=exc.message, status_code=exc.status_code,
         )
 
-    old_key = point.photo_key
+    old_keys = {point.photo_key, point.audio_key}
     apply_point(point, data)
 
-    if photo is not None:
-        # Substituir a foto apaga a anterior (PT-05)
-        try:
-            point.photo_key = store_file(db, f"points/{point.id}", "photo", *photo)
-        except HTTPException as exc:
-            return _render_form(
-                request, db, draft, point_id=point_id,
-                error=exc.detail, status_code=exc.status_code,
-            )
+    try:
+        sent = _store_files(db, point, photo, audio)
+    except HTTPException as exc:
+        return _render_form(
+            request, db, draft, point_id=point_id,
+            error=exc.detail, status_code=exc.status_code,
+        )
 
-        commit_or_delete_file(db, point.photo_key)
-    else:
-        if draft.remove_photo:
-            point.photo_key = None
+    # Remover só vale quando não veio um arquivo novo no lugar
+    if photo is None and draft.remove_photo:
+        point.photo_key = None
 
-        db.commit()
+    if audio is None and draft.remove_audio:
+        point.audio_key = None
+        point.audio_duration = None
 
-    if old_key and old_key != point.photo_key:
-        storage_service.delete_quietly(old_key)
+    commit_or_delete_files(db, sent)
+
+    # Substituir ou remover apaga o arquivo anterior (PT-05, PT-06)
+    for key in old_keys - {point.photo_key, point.audio_key, None}:
+        storage_service.delete_quietly(key)
 
     return _redirect("point-updated")
 
@@ -273,6 +326,9 @@ def _render_delete(
     if point.photo_key:
         consequences.append("A foto é apagada do armazenamento.")
 
+    if point.audio_key:
+        consequences.append("O áudio é apagado do armazenamento.")
+
     return templates.TemplateResponse(
         request=request,
         name="admin/confirm_delete.html",
@@ -304,7 +360,7 @@ def delete_point(point_id: int, request: Request, db: Session = Depends(get_db))
     if blockers:
         return _render_delete(request, point, blockers, status_code=409)
 
-    photo_key = point.photo_key
+    file_keys = [point.photo_key, point.audio_key]
     db.delete(point)
 
     try:
@@ -319,6 +375,7 @@ def delete_point(point_id: int, request: Request, db: Session = Depends(get_db))
             status_code=409,
         )
 
-    storage_service.delete_quietly(photo_key)
+    for key in file_keys:
+        storage_service.delete_quietly(key)
 
     return _redirect("point-deleted")

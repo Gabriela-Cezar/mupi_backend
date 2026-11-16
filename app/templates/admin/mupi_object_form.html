@@ -191,6 +191,41 @@
         </div>
 
 
+        <h2>Áudio</h2>
+
+        <div class="form-group">
+            <p>Opcional. Narração do ponto, que o visitante toca no app.</p>
+
+            {% if audio_url %}
+                <audio controls preload="none" src="{{ audio_url }}" class="audio-preview"></audio>
+                <p class="muted">Duração: {{ point.audio_duration | duration }}</p>
+            {% endif %}
+
+            <label for="audio">
+                {% if point.audio_key %}Substituir o áudio{% else %}Arquivo de áudio{% endif %}
+                (MP3 ou M4A, até 20 MB, cerca de 10 minutos)
+            </label>
+
+            <input
+                type="file"
+                id="audio"
+                name="audio"
+                accept="audio/mpeg,audio/mp4,audio/x-m4a,.mp3,.m4a"
+            >
+
+            {% if error and not editing %}
+                <p class="hint">Se você tinha escolhido um áudio, escolha de novo.</p>
+            {% endif %}
+
+            {% if point.audio_key %}
+                <label>
+                    <input type="checkbox" name="remove_audio" value="true">
+                    Remover o áudio atual
+                </label>
+            {% endif %}
+        </div>
+
+
         <h2>Vídeos do YouTube</h2>
 
         <p>

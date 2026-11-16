@@ -62,7 +62,7 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 
 ## Etapa 3 — Mídia e proximidade
 
-- [ ] **Backend:** áudio com validação pelo conteúdo e duração (PT-06)
+- [x] **Backend:** áudio com validação pelo conteúdo e duração (PT-06) — 16/11, migração 0010. MP3/M4A até 20 MB, duração com `mutagen`; enviar, substituir e remover no painel; coluna "Áudio" na lista; `has_audio` no resumo e `audio` (link de 1 h + duração) na abertura
 - [x] **Backend:** abertura recebe a precisão do GPS; distância máxima no `.env` com tolerância (VIS-01, VIS-02) — 16/11. `VISIT_MAX_DISTANCE_M` (padrão 25 m) e `VISIT_GPS_TOLERANCE_M` (padrão 15 m); `accuracy` opcional na abertura
 - [x] **Backend:** gravar latitude, longitude e precisão na visita (VIS-03); teste de concorrência (VIS-05) — 16/11, migração 0009
 - [x] **Backend:** devolver a distância máxima ao app (para o botão "Abrir" não repetir o valor) — 16/11, `GET /app-settings`

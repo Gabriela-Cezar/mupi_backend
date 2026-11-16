@@ -79,6 +79,20 @@ def _photo_url(obj: MupiObject) -> str | None:
     return storage_service.url(obj.photo_key)
 
 
+def serialize_audio(obj: MupiObject) -> dict | None:
+    """Áudio do ponto (PT-06): link temporário (1 h) e duração em segundos.
+
+    Só vai no conteúdo, entregue na abertura. O link do S3 aceita
+    requisições parciais (Range): o app toca sem baixar o arquivo inteiro.
+    """
+    url = storage_service.url(obj.audio_key, storage_service.AUDIO_URL_SECONDS)
+
+    if url is None:
+        return None
+
+    return {"url": url, "duration_seconds": obj.audio_duration}
+
+
 # ---------- Ponto MUPI ----------
 
 def mupi_load_options():
@@ -104,6 +118,7 @@ def serialize_summary(
         "themes": [serialize_theme(t) for t in obj.themes],
         "photo_url": _photo_url(obj),
         "has_video": bool(obj.videos),
+        "has_audio": bool(obj.audio_key),
         "address": obj.address,
         "visited": visited,
     }
@@ -120,6 +135,7 @@ def serialize_content(obj: MupiObject) -> dict:
         **serialize_summary(obj, visited=True),
         "sections": [serialize_section(s) for s in obj.sections],
         "videos": [serialize_video(v) for v in obj.videos],
+        "audio": serialize_audio(obj),
         "opening_hours": obj.opening_hours,
         "accessibility": obj.accessibility,
         "badges": [serialize_badge(b) for b in obj.badges],
