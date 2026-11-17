@@ -1,3 +1,5 @@
+import time
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import func
@@ -16,7 +18,12 @@ from app.model.user import User
 from app.model.user_badge import UserBadge
 from app.model.user_visit import UserVisit
 from app.service import storage_service
-from app.service.auth_service import password_hash, revoke_sessions
+from app.service.auth_service import check_password, revoke_sessions
+from app.service.google_auth_service import (
+    GoogleLoginDisabled,
+    GoogleTokenError,
+    verify_google_token,
+)
 from app.service.badge_service import award_badges, progress_of, visit_counts
 
 router = APIRouter(
@@ -165,8 +172,33 @@ DELETE_WINDOW_SECONDS = 15 * 60
 delete_account_limiter = RateLimiter(DELETE_ATTEMPTS, DELETE_WINDOW_SECONDS)
 
 
+# Confirmação pelo Google: o id_token tem de ser recente (o usuário acabou de
+# entrar com o Google para confirmar), não um guardado de dias atrás
+GOOGLE_CONFIRM_MAX_AGE_SECONDS = 10 * 60
+
+
 class DeleteAccountRequest(BaseModel):
-    password: str = Field(min_length=1, max_length=128)
+    # Conta com senha: a senha atual
+    password: str | None = Field(default=None, min_length=1, max_length=128)
+    # Conta com Google: um id_token recente (USR-08)
+    id_token: str | None = Field(default=None, min_length=1, max_length=8192)
+
+
+def _confirmed(user: User, data: DeleteAccountRequest) -> bool:
+    """A senha confere, ou o id_token é desta conta Google e é recente."""
+    if data.password is not None:
+        return check_password(user.password_hash, data.password)
+
+    if user.google_sub is None:
+        return False
+
+    try:
+        identity = verify_google_token(data.id_token)
+    except (GoogleTokenError, GoogleLoginDisabled):
+        return False
+
+    recent = time.time() - identity.issued_at <= GOOGLE_CONFIRM_MAX_AGE_SECONDS
+    return identity.sub == user.google_sub and recent
 
 
 @router.delete("/me")
@@ -175,13 +207,20 @@ def delete_account(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Exclui a conta de vez: usuário, visitas, insígnias conquistadas e
-    códigos de e-mail pendentes. Todos os tokens deixam de valer.
+    """Exclui a conta de vez: usuário, visitas, insígnias conquistadas,
+    progresso e conclusões de rota e códigos de e-mail pendentes. Todos os
+    tokens deixam de valer.
 
-    Pede a senha atual. Quando houver login com Google (contas sem senha),
-    elas vão confirmar com um id_token recente do Google.
+    Confirmação: a senha atual, ou (conta com Google) um id_token recente do
+    Google, obtido entrando com o Google de novo.
     """
     user_id = user.id
+
+    if data.password is None and data.id_token is None:
+        raise HTTPException(
+            status_code=422,
+            detail="Confirme com a sua senha ou entrando com o Google.",
+        )
 
     wait = delete_account_limiter.retry_after(user_id)
 
@@ -191,19 +230,35 @@ def delete_account(
             f"Muitas tentativas. Aguarde {format_wait(wait)} e tente novamente."
         )
 
-    if not password_hash.verify(data.password, user.password_hash):
+    if not _confirmed(user, data):
         delete_account_limiter.record(user_id)
         # 403, e não 401: o app trata 401 como sessão expirada
-        raise HTTPException(status_code=403, detail="Senha incorreta.")
+        detail = (
+            "Senha incorreta." if data.password is not None
+            else "Não foi possível confirmar com o Google. Entre com o Google de novo."
+        )
+        raise HTTPException(status_code=403, detail=detail)
 
     # Os tokens deixam de valer mesmo que algo guarde o usuário em cache
     revoke_sessions(user)
 
     db.query(EmailCode).filter(EmailCode.email == user.email).delete()
-    # Visitas e conquistas saem junto (ON DELETE CASCADE no banco)
+    # Visitas, conquistas e rotas saem junto (ON DELETE CASCADE no banco)
     db.delete(user)
     db.commit()
 
     delete_account_limiter.forget(user_id)
 
     return {"message": "Sua conta foi excluída."}
+
+
+# ---------- Sair de todos os aparelhos (USR-13) ----------
+
+@router.post("/me/logout-all")
+def logout_everywhere(user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+    """Encerra todas as sessões da conta, inclusive a deste aparelho: útil
+    quando o celular foi perdido ou alguém pode ter a senha."""
+    revoke_sessions(user)
+    db.commit()
+
+    return {"message": "Você saiu de todos os aparelhos."}

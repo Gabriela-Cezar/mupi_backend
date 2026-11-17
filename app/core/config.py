@@ -60,6 +60,17 @@ CORS_ALLOWED_ORIGIN_REGEX = os.getenv("CORS_ALLOWED_ORIGIN_REGEX") or None
 # e só essa rota responde com erro explicando que falta a chave.
 OPENROUTESERVICE_API_KEY = _optional("OPENROUTESERVICE_API_KEY")
 
+# ---------- Login com Google (USR-04) ----------
+# Client IDs OAuth do projeto no Google Cloud, separados por vírgula: o do
+# Android, o do iOS e o "web" (usado pelo Flutter e pelo navegador). O token
+# só é aceito se tiver sido emitido para um deles. Vazio = login com Google
+# desligado (a rota responde 503).
+GOOGLE_CLIENT_IDS = [
+    client_id.strip()
+    for client_id in (os.getenv("GOOGLE_CLIENT_IDS") or "").split(",")
+    if client_id.strip()
+]
+
 # ---------- Abertura do ponto (VIS-02) ----------
 # Distância máxima, em metros, entre o usuário e o ponto para abrir o conteúdo
 # e registrar a visita. Vale para todos os pontos; ajustar durante o beta.

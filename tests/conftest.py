@@ -15,6 +15,8 @@ os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
 os.environ.pop("S3_ENDPOINT_URL", None)
 # Vazio (e não ausente) para o .env do desenvolvedor não ligar a pasta local
 os.environ["LOCAL_STORAGE_DIR"] = ""
+# Login com Google desligado por padrão; os testes dele ligam (fixture google)
+os.environ["GOOGLE_CLIENT_IDS"] = ""
 # Regra de distância da abertura (VIS-02) fixa nos testes, independente do .env
 os.environ["VISIT_MAX_DISTANCE_M"] = "25"
 os.environ["VISIT_GPS_TOLERANCE_M"] = "15"
@@ -249,3 +251,4 @@ def user_client(app_de_teste, usuario, emails_enviados):
 
 # OpenRouteService simulado para os testes de rota (fixture `ors`)
 from tests.ors_falso import ors  # noqa: E402, F401
+from tests.google_falso import google  # noqa: E402, F401

@@ -1,5 +1,6 @@
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import BaseModel, EmailStr, Field
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.core.dependencies import get_current_user
@@ -29,6 +30,11 @@ from app.service.auth_user_email_service import (
     verificar_codigo_recuperacao,
 )
 from app.service.email_service import send_email
+from app.service.google_auth_service import (
+    GoogleLoginDisabled,
+    GoogleTokenError,
+    verify_google_token,
+)
 
 
 router = APIRouter(
@@ -303,6 +309,81 @@ def _session_response(user: User, message: str) -> dict:
         "user_id": user.id,
         "email": user.email
     }
+
+
+# ---------- Login com Google (USR-04) ----------
+
+class GoogleLoginRequest(BaseModel):
+    # id_token obtido pelo app com o google_sign_in
+    id_token: str = Field(min_length=1, max_length=8192)
+
+
+@router.post("/google")
+def google_login(
+    data: GoogleLoginRequest,
+    request: Request,
+    db: Session = Depends(get_db)
+):
+    """Entra com o Google, vinculando ou criando a conta.
+
+    1. já existe usuário com este google_sub → entra;
+    2. existe usuário com o mesmo e-mail → vincula o google_sub (o Google
+       confirmou o e-mail) e entra;
+    3. não existe → cria a conta, com e-mail verificado e sem senha.
+    """
+    ip = _client_ip(request)
+    wait = login_ip_limiter.retry_after(ip)
+
+    if wait:
+        raise too_many_requests(
+            wait,
+            f"Muitas tentativas de login. Aguarde {format_wait(wait)} e tente novamente."
+        )
+
+    try:
+        identity = verify_google_token(data.id_token)
+    except GoogleLoginDisabled:
+        raise HTTPException(status_code=503, detail="Login com Google indisponível no momento.")
+    except GoogleTokenError as exc:
+        login_ip_limiter.record(ip)
+        raise HTTPException(status_code=401, detail=str(exc))
+
+    user = db.query(User).filter(User.google_sub == identity.sub).first()
+    message = "Login realizado com sucesso"
+
+    if user is None:
+        user = get_user_by_email(db, identity.email)
+
+        if user is not None:
+            # Mesmo e-mail: a conta passa a entrar também pelo Google
+            user.google_sub = identity.sub
+            user.email_verified = True
+        else:
+            user = User(
+                email=normalize_email(identity.email),
+                email_verified=True,
+                password_hash=None,
+                google_sub=identity.sub,
+                # Explícito: o padrão do banco só vale depois de gravar
+                is_active=True,
+            )
+            db.add(user)
+            message = "Conta criada com sucesso"
+
+    if user.is_active is False:
+        raise HTTPException(status_code=403, detail="Esta conta está desativada.")
+
+    try:
+        db.commit()
+    except IntegrityError:
+        # Dois logins simultâneos criaram a mesma conta: usa a que ficou
+        db.rollback()
+        user = db.query(User).filter(User.google_sub == identity.sub).first()
+        if user is None:
+            raise HTTPException(status_code=409, detail="Tente entrar de novo.")
+
+    db.refresh(user)
+    return _session_response(user, message)
 
 
 # ---------- Renovação da sessão (USR-11) ----------

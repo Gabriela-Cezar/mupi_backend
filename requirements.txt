@@ -33,3 +33,4 @@ requests==2.34.2             # chamadas ao OpenRouteService (rota a pé)
 polyline==2.0.4              # decodifica o trajeto devolvido pelo OpenRouteService
 boto3==1.44.1                # arquivos no Amazon S3 (fotos, áudios, imagens de insígnia)
 mutagen==1.47.0              # áudio do ponto: formato e duração (PT-06)
+google-auth==2.40.3          # login com Google: valida o id_token (USR-04)

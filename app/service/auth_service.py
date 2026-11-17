@@ -54,6 +54,16 @@ def create_user(
     return user
 
 
+def check_password(stored_hash: str | None, password: str) -> bool:
+    """A senha confere. Sem senha (conta só com Google), confere contra um
+    hash fictício: a resposta leva o mesmo tempo e não revela nada."""
+    if stored_hash is None:
+        password_hash.verify(password, _DUMMY_HASH)
+        return False
+
+    return password_hash.verify(password, stored_hash)
+
+
 def authenticate_user(
     db: Session,
     email: str,
@@ -65,7 +75,9 @@ def authenticate_user(
         password_hash.verify(password, _DUMMY_HASH)
         return None
 
-    if not password_hash.verify(password, user.password_hash):
+    # Conta só com Google (sem senha) recebe a mesma resposta de senha
+    # errada, e no mesmo tempo, para não revelar que existe (USR-03)
+    if not check_password(user.password_hash, password):
         return None
 
     if not user.is_active:

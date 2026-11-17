@@ -22,9 +22,18 @@ class User(Base):
         nullable=False
     )
 
+    # Vazio na conta criada pelo login com Google (USR-04); a recuperação de
+    # senha permite criar uma depois (USR-06)
     password_hash = Column(
         String(255),
-        nullable=False
+        nullable=True
+    )
+
+    # Identificador da conta Google ("sub" do id_token), quando vinculada
+    google_sub = Column(
+        String(255),
+        unique=True,
+        nullable=True
     )
 
     # Muda (+1) para cancelar todas as sessões e links de recuperação já

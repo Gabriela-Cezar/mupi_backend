@@ -93,14 +93,14 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 2. [x] **App:** modelos `RouteSummary`, `RouteDetail`; lista e detalhes com o mapa do trajeto (APP-ROT-01, 02) — 16/11. "Rotas" no menu do mapa; o botão "Iniciar rota" aparece quando o iniciar existir (passo 5)
 3. [x] **Backend:** listar/ver (ROT-04 — feito em 16/11, com a tabela de conclusões `user_route_completions`, migração 0013), iniciar (ROT-05), rota ativa (ROT-06), finalizar ponto (ROT-07), encerrar (ROT-08), abandonar (ROT-09), rota alterada pelo administrador (ROT-10) — 16/11, migração 0014 (`user_active_routes`). Aviso do ROT-10 entregue uma vez em `GET /users/me/active-route`; pontos só de rota abrem com a rota ativa; o painel avisa quantos estão fazendo a rota
 4. [x] **Backend:** insígnia de conclusão de rota (INS-04); tabela de eventos de rota iniciada/abandonada/concluída (observação do ADM-10) — 16/11, migração 0015. Tipo `route_completion` (uma por rota) no painel; concedida ao encerrar e retroativa no perfil; bloqueada no perfil sem revelar a rota; rota com insígnia não pode ser excluída; `route_events` também registra a rota encerrada pelo painel
-5. [ ] **App:** `ActiveRoute`; iniciar com tratamento do 409 (APP-ROT-03); rota ativa no mapa (APP-ROT-04)
-6. [ ] **App:** finalizar ponto, tela de conclusão, abandonar, rota encerrada pelo administrador (APP-ROT-05, 06, 07, 08)
+5. [x] **App:** `ActiveRoute`; iniciar com tratamento do 409 (APP-ROT-03); rota ativa no mapa (APP-ROT-04) — 16/11. Iniciar volta ao mapa traçando o caminho de onde o usuário está até o primeiro ponto; depois, o trecho da rota até o próximo fica em destaque; aviso de chegada ao próximo ponto; a seta na borda da tela (desejável) não foi feita
+6. [x] **App:** finalizar ponto, tela de conclusão, abandonar, rota encerrada pelo administrador (APP-ROT-05, 06, 07, 08) — 16/11. O aviso do administrador aparece numa janela. A conferir num aparelho, andando a rota
 
 ## Etapa 6 — Login com Google
 
-- [ ] **Backend:** `POST /auth/google` com `google_sub` e `password_hash` opcional (USR-04)
-- [ ] **Backend:** recuperação de senha cria senha em conta só Google (USR-06); exclusão de conta só Google com `id_token` (USR-08)
-- [ ] **Backend [DESEJÁVEL]:** sair de todos os aparelhos (USR-13)
+- [x] **Backend:** `POST /auth/google` com `google_sub` e `password_hash` opcional (USR-04) — 17/11, migração 0016, `google-auth`; Client IDs em `GOOGLE_CLIENT_IDS`
+- [x] **Backend:** recuperação de senha cria senha em conta só Google (USR-06); exclusão de conta só Google com `id_token` (USR-08) — 17/11; o `id_token` da exclusão precisa ter no máximo 10 min
+- [x] **Backend [DESEJÁVEL]:** sair de todos os aparelhos (USR-13) — 17/11, `POST /users/me/logout-all`
 - [ ] **App:** botão "Entrar com Google" (APP-AUT-04); texto da recuperação para os dois casos (APP-AUT-03); exclusão de conta pelo Google (APP-AUT-08)
 - [ ] "Entrar com a Apple", se decidido na Etapa 0
 
