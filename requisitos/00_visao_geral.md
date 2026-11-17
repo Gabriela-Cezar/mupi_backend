@@ -1,86 +1,116 @@
 # MUPI — Museu Urbano de Percurso Interativo
-## Requisitos do backend — Visão geral
+## Requisitos — Visão geral
 
-Data: 10/11/2026
-Meta: lançamento em **janeiro/2027**, precedido de um **beta com 10 usuários**.
-Escopo inicial: **40 pontos MUPI em uma única cidade**, conteúdo apenas em português.
-Cliente: app mobile em **Flutter** (repositório separado). Não haverá versão web do app.
-Administração: painel web servido pelo próprio backend, usado por **3 administradores com o mesmo nível de acesso**.
+Versão: 17/11/2026, escrita a partir do código (backend na migração `0017`,
+1031 testes; app com 451 testes). Substitui os requisitos de 10/11/2026,
+que continuam no histórico do git.
+
+Os mesmos arquivos ficam em `mupi_backend/requisitos` e
+`mupi_application/requisitos` e devem continuar idênticos (conferir com `cmp`).
 
 ---
 
-## 1. O que é o produto
+## 1. O produto
 
-O usuário anda pela cidade guiado pelo aplicativo e visita pontos turísticos e históricos (pontos MUPI).
-- Os pontos podem ser visitados **individualmente** ou dentro de **rotas** (sequência fixa de pontos ligados por um trajeto a pé).
-- O conteúdo de cada ponto (blocos de texto, foto, áudio, vídeos do YouTube, informações de estabelecimento) só é liberado quando o usuário **está próximo e abre o ponto no app**.
-- Abrir o ponto perto dele registra a **visita**. As visitas liberam **insígnias**, que ficam registradas para sempre no perfil do usuário.
+O usuário anda pela cidade guiado pelo app e visita **pontos MUPI** (lugares
+turísticos e históricos).
 
-## 2. Áreas do projeto (um arquivo por área)
+- O conteúdo de cada ponto (blocos de texto, foto, áudio, vídeos do YouTube,
+  informações do local) só é entregue quando o usuário **está perto e abre o
+  ponto**. Abrir o ponto perto registra a **visita**.
+- Os pontos podem ser visitados soltos ou dentro de **rotas**: sequência fixa
+  de pontos ligados por um trajeto a pé. Dentro de uma rota, um ponto pode
+  mostrar um **conteúdo próprio da rota**.
+- Visitas e rotas concluídas rendem **insígnias**, que ficam para sempre no
+  perfil.
+- O conteúdo é cadastrado por **administradores** num painel web servido pelo
+  próprio backend.
 
-| Arquivo | Área |
-|---|---|
-| `01_correcoes_e_falhas.md` | Falhas encontradas no código atual e dívidas técnicas |
-| `02_usuarios_e_autenticacao.md` | Cadastro, login (e-mail e Google), recuperação de senha, perfil, exclusão de conta |
-| `03_pontos_mupi_e_conteudo.md` | Pontos MUPI, temas, blocos de texto, foto, áudio, vídeos, dados de estabelecimento, mapa |
-| `04_visitas.md` | Abertura do ponto, validação de proximidade, registro de visita, histórico |
-| `05_rotas.md` | Cadastro de rotas, trajeto a pé, iniciar/encerrar rota, progresso, conclusão |
-| `06_insignias.md` | Tipos de insígnia, regras de concessão, progresso, perfil |
-| `07_painel_administrativo.md` | Login de admin, cadastro/edição/desativação/exclusão de tudo, estatísticas |
-| `08_infraestrutura.md` | Banco, migrações, armazenamento de arquivos, hospedagem, segurança, testes, beta |
+Metas: **beta com 10 usuários** e lançamento em **janeiro de 2027**; cerca de
+**40 pontos em uma cidade**; conteúdo só em português; **3 administradores**
+com o mesmo nível de acesso.
 
-## 3. Decisões já tomadas (Etapa 2)
+## 2. Decisões de produto
 
 | Tema | Decisão |
 |---|---|
-| Blocos de texto | Vários por ponto; título livre (em negrito no app) + texto; ordem definida pelo admin |
-| Leitura acessível | O texto deve poder ser ouvido (leitura em voz alta) |
-| Foto | Uma por ponto, sem legenda/autor; visível no mapa mesmo de longe |
-| Áudio | No máximo um por ponto, opcional (a maioria não terá), até ~10 min, tocado pelo usuário, sem transcrição |
-| Vídeo | Apenas links do YouTube |
-| Temas | Um ponto pode ter vários temas |
-| Estabelecimento parceiro | Campos dentro do próprio ponto (endereço, horário, acessibilidade). No futuro, uma rota também poderá ser de um estabelecimento |
-| Conteúdo | Só aparece quando o usuário está próximo e clica no ponto |
-| Visita | Validada por localização + abertura do menu do ponto; não precisa interagir com as mídias |
-| Distância máxima | Igual para todos os pontos; 50 m parece muito → valor configurável, ajustado no beta |
-| Login | Obrigatório para usar o app |
-| Offline | Não haverá no primeiro momento |
-| Rotas | Ordem fixa; trajeto real a pé entre todos os pontos; nome, descrição, capa, distância, tempo, dificuldade, tema, classificação indicativa |
-| Ponto em rotas | Pode estar em várias rotas; um campo define se ele também existe individualmente (se não, não aparece no mapa geral) |
-| Rota ativa | Apenas uma por vez; não pode pausar; ao encerrar perde o progresso e precisa reiniciar |
-| Avanço na rota | O usuário finaliza cada ponto em ordem; só finaliza o próximo após o anterior |
-| Conclusão da rota | Todos os pontos finalizados → usuário encerra a rota → recebe a insígnia da rota |
-| Visitas durante rota | Visitar pontos fora da rota vale normalmente |
-| Insígnias | Coletadas automaticamente; ficam com o usuário mesmo que o ponto seja removido |
-| Login social | Conta Google |
-| Duração da sessão no app | 30 dias, renovada a cada abertura do app (quem usa não precisa entrar de novo) — USR-11 |
-| Exclusão de conta | Permitida |
-| Histórico | Só a lista de pontos visitados |
-| Ranking / compartilhamento / notificações | Não, por enquanto |
-| Rascunho de conteúdo | Não |
-| Estatísticas no painel | Desejável |
-| Hospedagem | AWS: Lightsail (API) + PostgreSQL gerenciado (Lightsail DB ou RDS) + S3 (arquivos), região São Paulo; e-mail continua no Resend |
-| Equipe de desenvolvimento | Uma única desenvolvedora (backend e app) |
+| Login | Obrigatório para usar o app. E-mail e senha ou conta Google |
+| Sessão no app | 30 dias, renovada a cada abertura |
+| Conteúdo | Só aparece quando o usuário está perto e abre o ponto |
+| Visita | Vale a abertura perto do ponto; não precisa ver as mídias. Uma visita por ponto por usuário |
+| Distância | Igual para todos os pontos, configurável (padrão 25 m + até 15 m de tolerância ao GPS), a ajustar no beta |
+| Blocos de texto | Vários por ponto: título (em negrito) + texto, na ordem do administrador |
+| Foto | Uma por ponto, visível no mapa mesmo de longe |
+| Áudio | No máximo um por ponto, opcional, até cerca de 10 min |
+| Vídeo | Só links do YouTube, tocados dentro do app |
+| Leitura em voz alta | O texto do ponto pode ser ouvido |
+| Temas | Um ponto pode ter vários temas; uma rota também |
+| Estabelecimento parceiro | Endereço, horário e acessibilidade no próprio ponto |
+| Ponto só de rota | Não aparece no mapa nem na busca; abre só com a rota ativa que o contém |
+| Rotas | Ordem fixa, trajeto real a pé, uma rota ativa por vez, sem pausa; abandonar perde o progresso |
+| Conteúdo na rota | O ponto pode ter outro conteúdo (até nome e foto) dentro de cada rota; vale só com aquela rota ativa |
+| Insígnias | Concedidas sozinhas; ficam com o usuário mesmo se o ponto ou a rota sair do ar |
+| Histórico | Lista dos pontos visitados |
+| Exclusão de conta | Permitida, pelo próprio app |
+| Offline, ranking, compartilhamento, notificações, outros idiomas | Não no lançamento |
 
-## 4. Classificação de prioridade usada nos arquivos
+## 3. Arquitetura
 
-- **[MVP]** — obrigatório para o beta/lançamento de janeiro.
-- **[DESEJÁVEL]** — entra em janeiro se houver tempo.
-- **[FUTURO]** — registrado para não se perder, fora do escopo de janeiro.
+| Parte | Tecnologia | Onde |
+|---|---|---|
+| API e painel | Python, FastAPI, SQLAlchemy, Alembic, Jinja2 | `mupi_backend` |
+| Banco | PostgreSQL (SQLite nos testes) | — |
+| Arquivos | Amazon S3 privado, com links assinados; pasta local no desenvolvimento | — |
+| E-mail | Resend | — |
+| Trajeto a pé | OpenRouteService (`foot-walking`) | — |
+| Login Google | `google-auth` (backend), `google_sign_in` (app) | — |
+| App | Flutter (Android e iOS; roda no Chrome para testes) | `mupi_application` |
+| Mapa no app | `flutter_map` com OpenStreetMap | — |
+| Hospedagem prevista | AWS: Lightsail (API) + banco gerenciado + S3, região São Paulo | `infra/` |
 
-## 5. Ordem sugerida de execução (≈ 8 semanas até janeiro)
+## 4. Arquivos
 
-> **Substituída em 12/11/2026 por `09_ordem_de_execucao.md`** (ordem conjunta do backend e do app). O texto abaixo fica só como histórico.
+| Arquivo | Assunto | Prefixo |
+|---|---|---|
+| `01_contas_e_acesso.md` | Cadastro, login, Google, sessão, senha, exclusão | `CON` |
+| `02_pontos_e_conteudo.md` | Pontos, temas, conteúdo, mapa, busca, "Como chegar", tela do ponto | `PON` |
+| `03_visitas.md` | Abertura do ponto, proximidade, visita, histórico | `VIS` |
+| `04_rotas.md` | Rotas, trajeto, rota ativa, conteúdo do ponto na rota | `ROT` |
+| `05_insignias_e_perfil.md` | Insígnias, concessão, perfil | `INS` |
+| `06_painel_administrativo.md` | Painel web dos administradores | `ADM` |
+| `07_infraestrutura_e_qualidade.md` | Configuração, arquivos, segurança, backups, testes, acessibilidade | `INF` |
+| `08_publicacao.md` | Produção, identidade do app, lojas, beta | `PUB` |
+| `09_plano.md` | O que falta, em ordem | — |
+| `10_api_do_app.md` | Referência das rotas da API usadas pelo app | — |
 
-1. **Semana 1** — Correções críticas (arquivo 01), migrações com Alembic, `requirements.txt`, conta AWS configurada (alertas de custo, bucket S3, banco) e camada de armazenamento (arquivo 08).
-2. **Semana 2** — Login do painel admin + novo modelo de ponto (temas múltiplos, blocos de texto, foto única, áudio, vídeos, campos de estabelecimento).
-3. **Semana 3** — Mapa, abertura do ponto com proximidade, registro de visita, novo fluxo de insígnias de ponto e de contagem.
-4. **Semanas 4 e 5** — Rotas (cadastro, trajeto, iniciar/finalizar pontos/encerrar, insígnia de rota).
-5. **Semana 6** — Login com Google, exclusão de conta, histórico, edição/exclusão completas no painel.
-6. **Semana 7** — Hospedagem, testes, cadastro do conteúdo real, início do beta.
-7. **Semana 8** — Ajustes do beta (inclusive a distância de proximidade) e estatísticas, se houver tempo.
+## 5. Como ler cada requisito
 
-## 6. Pendências ainda abertas
+```
+### PON-03 — Título [Prioridade] Status
+- Comportamento esperado (o que o sistema faz ou deve fazer)
+- Onde: arquivos principais
+- Testes: arquivos de teste
+```
 
-- Valor inicial da distância de proximidade (sugestão: 25 m, ajustar no beta).
-- Data exata do beta.
+**Prioridade:** `[Lançamento]` necessário para o beta e o lançamento;
+`[Desejável]` melhora o produto, mas não bloqueia; `[Futuro]` fora do lançamento.
+
+**Status:**
+- ✅ **Feito**: implementado e coberto por testes automáticos;
+- 📱 **Feito, a conferir**: implementado e testado, mas ainda não conferido
+  num celular de verdade (GPS, áudio, câmera, permissões, leitor de tela);
+- 🟡 **Parcial**: parte feita; o que falta está descrito;
+- ⬜ **Pendente**: ainda não feito;
+- 💡 **Futuro**: ideia registrada, fora do lançamento.
+
+## 6. Regras de trabalho
+
+- **Testes junto com cada mudança:** `pytest` no backend e `flutter test` no
+  app; `flutter analyze` sem problemas.
+- **Mensagens ao usuário em português**, prontas para mostrar.
+- **Configuração só pelo `.env`** (backend: lida apenas em `app/core/config.py`)
+  e por `--dart-define` (app).
+- **Toda mudança de banco por migração do Alembic**, testada para subir e descer.
+- **Mudança numa rota da API:** atualizar `10_api_do_app.md` e dizer se o
+  app precisa mudar.
+- **Estes arquivos e o plano ficam idênticos nos dois repositórios.**
