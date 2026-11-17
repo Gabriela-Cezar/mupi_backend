@@ -201,6 +201,15 @@ def test_recuperacao_cria_uma_senha_na_conta_google(client, db_session, google):
     assert entrar(client, google.conta()).status_code == 200
 
 
+def test_perfil_diz_se_a_conta_tem_senha_e_google(client, db_session, google):
+    token = entrar(client, google.conta()).json()["access_token"]
+
+    perfil = client.get("/users/me", headers={"Authorization": f"Bearer {token}"}).json()
+
+    assert perfil["has_password"] is False
+    assert perfil["google_linked"] is True
+
+
 # ---------- Exclusão de conta pelo Google (USR-08) ----------
 
 def logado(client, db_session):

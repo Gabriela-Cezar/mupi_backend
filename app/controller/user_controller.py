@@ -120,6 +120,9 @@ def get_profile(
         "id": user.id,
         "email": user.email,
         "created_at": user.created_at.isoformat(),
+        # Como confirmar a exclusão da conta: pela senha e/ou pelo Google
+        "has_password": user.password_hash is not None,
+        "google_linked": user.google_sub is not None,
         "visits_total": visits_total,
         "badges_collected": len(collected),
         "badges_total": active_total + inactive_collected,

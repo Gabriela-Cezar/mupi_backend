@@ -115,6 +115,7 @@ def test_perfil_tem_todos_os_campos(user_client):
     assert set(perfil) == {
         "id", "email", "created_at", "visits_total", "badges_collected",
         "badges_total", "badges", "in_progress", "locked", "active_route",
+        "has_password", "google_linked",
     }
     assert perfil["active_route"] is None
 

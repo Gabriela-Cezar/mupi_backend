@@ -101,7 +101,7 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 - [x] **Backend:** `POST /auth/google` com `google_sub` e `password_hash` opcional (USR-04) — 17/11, migração 0016, `google-auth`; Client IDs em `GOOGLE_CLIENT_IDS`
 - [x] **Backend:** recuperação de senha cria senha em conta só Google (USR-06); exclusão de conta só Google com `id_token` (USR-08) — 17/11; o `id_token` da exclusão precisa ter no máximo 10 min
 - [x] **Backend [DESEJÁVEL]:** sair de todos os aparelhos (USR-13) — 17/11, `POST /users/me/logout-all`
-- [ ] **App:** botão "Entrar com Google" (APP-AUT-04); texto da recuperação para os dois casos (APP-AUT-03); exclusão de conta pelo Google (APP-AUT-08)
+- [x] **App:** botão "Entrar com Google" (APP-AUT-04); texto da recuperação para os dois casos (APP-AUT-03); exclusão de conta pelo Google (APP-AUT-08) — 17/11, `google_sign_in` 7.2; Client IDs por `--dart-define` (sem eles o botão não aparece); no navegador, o botão do próprio Google. A testar com credenciais reais
 - [ ] "Entrar com a Apple", se decidido na Etapa 0
 
 ## Etapa 7 — Preparação do beta
