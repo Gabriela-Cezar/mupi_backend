@@ -18,3 +18,4 @@ from app.model.route import Route, RoutePoint, RouteTheme  # noqa: F401
 from app.model.user_route_completion import UserRouteCompletion  # noqa: F401
 from app.model.user_active_route import UserActiveRoute  # noqa: F401
 from app.model.route_event import RouteEvent  # noqa: F401
+from app.model.route_point_content import RoutePointContent, RoutePointSection, RoutePointVideo  # noqa: F401

@@ -28,6 +28,8 @@ MESSAGES = {
     "route-activated": "Rota ativada: ela aparece no app.",
     "route-deactivated": "Rota desativada: ela não aparece mais no app.",
     "route-deleted": "Rota excluída.",
+    "route-point-content-saved": "Conteúdo do ponto nesta rota salvo.",
+    "route-point-content-deleted": "O ponto volta a mostrar o próprio conteúdo nesta rota.",
     "point-deactivated-routes": "Ponto desativado. As rotas que passam por ele também foram desativadas, até serem corrigidas.",
     "point-updated-routes": "Ponto atualizado. Como ele foi desativado, as rotas que passam por ele também foram desativadas.",
 }

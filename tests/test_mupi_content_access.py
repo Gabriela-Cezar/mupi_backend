@@ -29,7 +29,7 @@ CAMPOS_DO_RESUMO = {
     "has_audio", "address", "visited",
 }
 CAMPOS_DO_CONTEUDO = {
-    "sections", "videos", "audio", "opening_hours", "accessibility", "badges",
+    "sections", "videos", "audio", "opening_hours", "accessibility", "badges", "route_content",
 }
 
 VIDEO_ID = "dQw4w9WgXcQ"

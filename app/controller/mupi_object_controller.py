@@ -21,6 +21,7 @@ from app.model.mupi_object import MupiObject
 from app.model.user import User
 from app.model.user_visit import UserVisit
 from app.service.badge_service import register_visit, visit_counts
+from app.service.route_point_content_service import content_for_user
 from app.service.proximity_service import (
     bounding_box,
     get_active_mupi,
@@ -193,8 +194,11 @@ def open_mupi_object(
 
     mupi = get_active_mupi(db, object_id, mupi_load_options(), user_id)
 
+    # Fazendo uma rota com conteúdo próprio para este ponto: vale o da rota
+    route_content = content_for_user(db, user_id, object_id)
+
     return {
-        **serialize_content(mupi),
+        **serialize_content(mupi, route_content),
         "new_visit": new_visit,
         "visits_total": visits_total,
         "awarded": awarded_data,

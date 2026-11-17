@@ -141,7 +141,11 @@
                     <span class="point-number"></span>
                     <span class="point-name">
                         {{ point.name }}{% if not point.active %} <span class="tag tag-warn">desativado</span>{% endif %}
+                        {% if point.id in custom_point_ids %} <span class="tag">conteúdo próprio</span>{% endif %}
                     </span>
+                    {% if point.id in saved_point_ids %}
+                        <a href="/admin/routes/{{ saved.id }}/points/{{ point.id }}/content">Conteúdo nesta rota</a>
+                    {% endif %}
                     <button type="button" class="secondary" data-move="-1">Subir</button>
                     <button type="button" class="secondary" data-move="1">Descer</button>
                     <button type="button" class="danger" data-remove>Remover</button>

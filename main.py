@@ -13,6 +13,7 @@ from app.controller.admin_theme_controller import router as admin_theme_router
 from app.controller.admin_mupi_object_controller import router as admin_mupi_object_router
 from app.controller.admin_badge_controller import router as admin_badge_router
 from app.controller.admin_route_controller import router as admin_route_router
+from app.controller.admin_route_point_content_controller import router as admin_route_point_content_router
 from app.controller.route_controller import router as route_router
 from app.controller.active_route_controller import (
     router as active_route_router,
@@ -36,6 +37,7 @@ app.include_router(admin_theme_router)
 app.include_router(admin_mupi_object_router)
 app.include_router(admin_badge_router)
 app.include_router(admin_route_router)
+app.include_router(admin_route_point_content_router)
 
 app.mount(
     "/admin-static",

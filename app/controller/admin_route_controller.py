@@ -44,6 +44,11 @@ from app.model.route import Route, RoutePoint
 from app.model.theme import Theme
 from app.model.user_route_completion import UserRouteCompletion
 from app.service import storage_service
+from app.service.route_point_content_service import (
+    contents_for_route,
+    remove_contents_outside,
+    route_file_keys,
+)
 from app.model.user_active_route import CancelReason
 from app.service.active_route_service import cancel_progress, users_doing
 from app.service.route_path_service import update_route_path
@@ -150,6 +155,9 @@ def _render_form(
             "difficulties": [(d.value, label) for d, label in DIFFICULTY_LABELS.items()],
             "age_ratings": [(a.value, label) for a, label in AGE_RATING_LABELS.items()],
             "problems": activation_problems(route) if route is not None else [],
+            # Pontos salvos na rota (podem ter conteúdo próprio nela)
+            "saved_point_ids": set(route.point_ids) if route is not None else set(),
+            "custom_point_ids": set(contents_for_route(db, route.id)) if route is not None else set(),
             # Aviso: mudar os pontos ou desativar encerra o progresso (ADM-07)
             "users_doing": users_doing(db, route.id) if route is not None else 0,
             "error": error,
@@ -176,10 +184,11 @@ def _save(
     draft: RouteDraft,
     data,
     cover: tuple[bytes, str] | None,
-) -> tuple[list[str], str | None]:
+) -> tuple[list[str], str | None, list[str]]:
     """Grava a rota, calcula o trajeto se preciso e confere a ativação.
 
-    Devolve (arquivos enviados, código da mensagem). Erros de envio da capa
+    Devolve (arquivos enviados, código da mensagem, arquivos a apagar depois
+    de gravar: os do conteúdo dos pontos que saíram). Erros de envio da capa
     sobem como HTTPException.
 
     Mudar os pontos/a ordem ou desativar encerra o progresso de quem está
@@ -188,6 +197,9 @@ def _save(
     was_active = route.active
     points_changed = apply_route(db, route, data)
     db.flush()
+
+    # Ponto que saiu da rota: o conteúdo dele nesta rota vai junto
+    removed = remove_contents_outside(db, route) if points_changed else []
 
     sent: list[str] = []
 
@@ -211,12 +223,12 @@ def _save(
         cancel_progress(db, route.id, CancelReason.ROUTE_DEACTIVATED)
 
     if not path_ok:
-        return sent, "route-saved-path-error"
+        return sent, "route-saved-path-error", removed
 
     if data.active and problems:
-        return sent, "route-saved-inactive"
+        return sent, "route-saved-inactive", removed
 
-    return sent, None
+    return sent, None, removed
 
 
 @router.get("/new")
@@ -238,7 +250,7 @@ async def create_route(request: Request, db: Session = Depends(get_db)):
     db.add(route)
 
     try:
-        sent, warning = _save(db, route, draft, data, cover)
+        sent, warning, _ = _save(db, route, draft, data, cover)
     except HTTPException as exc:
         return _render_form(request, db, draft, error=exc.detail, status_code=exc.status_code)
 
@@ -279,7 +291,7 @@ async def update_route(route_id: int, request: Request, db: Session = Depends(ge
     old_cover = route.cover_key
 
     try:
-        sent, warning = _save(db, route, draft, data, cover)
+        sent, warning, removed = _save(db, route, draft, data, cover)
     except HTTPException as exc:
         route = _get_route(db, route_id)
         return _render_form(
@@ -297,6 +309,9 @@ async def update_route(route_id: int, request: Request, db: Session = Depends(ge
 
     if old_cover and old_cover != route.cover_key:
         storage_service.delete_quietly(old_cover)
+
+    for key in removed:
+        storage_service.delete_quietly(key)
 
     if warning:
         return _redirect(warning, f"{LIST_URL}/{route.id}/edit")
@@ -418,7 +433,7 @@ def delete_route(route_id: int, request: Request, db: Session = Depends(get_db))
     if blockers:
         return _render_delete(request, route, blockers, status_code=409)
 
-    cover_key = route.cover_key
+    file_keys = [route.cover_key, *route_file_keys(db, route.id)]
     db.delete(route)
 
     try:
@@ -428,6 +443,7 @@ def delete_route(route_id: int, request: Request, db: Session = Depends(get_db))
         route = _get_route(db, route_id)
         return _render_delete(request, route, ["A rota tem histórico de uso."], status_code=409)
 
-    storage_service.delete_quietly(cover_key)
+    for key in file_keys:
+        storage_service.delete_quietly(key)
 
     return _redirect("route-deleted")

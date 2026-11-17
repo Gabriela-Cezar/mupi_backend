@@ -9,8 +9,6 @@ from sqlalchemy.orm import selectinload
 from app.model.badge import Badge
 from app.core.youtube import watch_url
 from app.model.mupi_object import MupiObject
-from app.model.mupi_object_section import MupiObjectSection
-from app.model.mupi_object_video import MupiObjectVideo
 from app.model.user_badge import UserBadge
 from app.service import storage_service
 
@@ -67,12 +65,12 @@ def serialize_theme(theme) -> dict:
     return {"id": theme.id, "name": theme.name}
 
 
-def serialize_section(section: MupiObjectSection) -> dict:
+def serialize_section(section) -> dict:
     # Texto limpo, sem marcações: o app formata e pode ler em voz alta (PT-04)
     return {"title": section.title, "body": section.body}
 
 
-def serialize_video(video: MupiObjectVideo) -> dict:
+def serialize_video(video) -> dict:
     return {
         "youtube_id": video.youtube_id,
         "title": video.title,
@@ -85,7 +83,7 @@ def _photo_url(obj: MupiObject) -> str | None:
     return storage_service.url(obj.photo_key)
 
 
-def serialize_audio(obj: MupiObject) -> dict | None:
+def serialize_audio(obj) -> dict | None:
     """Áudio do ponto (PT-06): link temporário (1 h) e duração em segundos.
 
     Só vai no conteúdo, entregue na abertura. O link do S3 aceita
@@ -135,15 +133,41 @@ def serialize_summary(
     return data
 
 
-def serialize_content(obj: MupiObject) -> dict:
-    """Conteúdo completo (PT-13): só para quem abriu o ponto estando perto."""
+def serialize_content(obj: MupiObject, route_content=None) -> dict:
+    """Conteúdo completo (PT-13): só para quem abriu o ponto estando perto.
+
+    Com [route_content] (o usuário está fazendo uma rota que tem conteúdo
+    próprio para o ponto), ele substitui o do ponto: blocos, áudio, vídeos e
+    informações do local. Nome e foto em branco na rota = os do ponto. A
+    posição e as insígnias são sempre as do ponto.
+    """
+    source = route_content or obj
+    summary = serialize_summary(obj, visited=True)
+
+    if route_content is not None:
+        summary.update({
+            "name": route_content.name or obj.name,
+            "photo_url": (
+                storage_service.url(route_content.photo_key)
+                if route_content.photo_key else summary["photo_url"]
+            ),
+            "has_video": bool(route_content.videos),
+            "has_audio": bool(route_content.audio_key),
+            "address": route_content.address,
+        })
+
     return {
-        **serialize_summary(obj, visited=True),
-        "sections": [serialize_section(s) for s in obj.sections],
-        "videos": [serialize_video(v) for v in obj.videos],
-        "audio": serialize_audio(obj),
-        "opening_hours": obj.opening_hours,
-        "accessibility": obj.accessibility,
+        **summary,
+        "sections": [serialize_section(s) for s in source.sections],
+        "videos": [serialize_video(v) for v in source.videos],
+        "audio": serialize_audio(source),
+        "opening_hours": source.opening_hours,
+        "accessibility": source.accessibility,
         # Insígnias de visita deste ponto; as desativadas não aparecem
         "badges": [serialize_badge(b) for b in obj.badges if b.active],
+        # De qual rota é este conteúdo (null = o conteúdo normal do ponto)
+        "route_content": (
+            {"route_id": route_content.route_id, "route_name": route_content.route.name}
+            if route_content is not None else None
+        ),
     }

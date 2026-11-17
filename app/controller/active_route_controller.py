@@ -25,6 +25,7 @@ from app.controller.serializers import serialize_collected
 from app.model.route_event import RouteEventKind
 from app.service.active_route_service import NOTICES, get_progress, point_status, record_event
 from app.service.badge_service import award_badges
+from app.service.route_point_content_service import contents_for_route
 from app.service.proximity_service import get_mupi_in_range
 
 router = APIRouter(
@@ -61,19 +62,22 @@ def serialize_active_route(db: Session, progress: UserActiveRoute) -> dict:
     total = len(route.points)
 
     data = serialize_route_detail(
-        route, _completed(db, progress.user_id, route.id), _visited(db, progress.user_id)
+        route,
+        _completed(db, progress.user_id, route.id),
+        _visited(db, progress.user_id),
+        contents_for_route(db, route.id),
     )
 
     for index, point in enumerate(data["points"]):
         point["status"] = point_status(index, next_index)
 
-    next_point = route.points[next_index].mupi_object if next_index < total else None
+    next_point = data["points"][next_index] if next_index < total else None
 
     return {
         "route": data,
         "started_at": progress.started_at.isoformat(),
         "next_index": next_index,
-        "next_point": {"id": next_point.id, "name": next_point.name} if next_point else None,
+        "next_point": {"id": next_point["id"], "name": next_point["name"]} if next_point else None,
         # Trecho do ponto anterior ao atual (índice em route.waypoints). No
         # primeiro ponto não há trecho: o app usa o "Como chegar"
         "current_leg": next_index - 1 if 0 < next_index < total else None,

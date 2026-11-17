@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+    <meta charset="UTF-8">
+    <title>{{ point.name }} na rota {{ route.name }}</title>
+
+    <link
+        rel="stylesheet"
+        href="/admin-static/style.css"
+    >
+</head>
+
+<body>
+
+{% include "admin/_admin_header.html" %}
+
+<div class="container">
+
+    <p><a href="/admin/routes/{{ route.id }}/edit">← Voltar para a rota</a></p>
+
+    <h1>{{ point.name }} na rota {{ route.name }}</h1>
+
+    <p>
+        Quem abrir este ponto <strong>fazendo esta rota</strong> vê o conteúdo abaixo,
+        no lugar do conteúdo normal do ponto. Fora da rota (ou em outra rota), continua
+        valendo o conteúdo do ponto. A localização é sempre a do ponto.
+    </p>
+
+    {% if not exists %}
+        <p class="hint">
+            Este ponto ainda usa o próprio conteúdo nesta rota. O formulário começa com
+            os textos e vídeos do ponto: edite e salve para a rota ter o conteúdo próprio.
+        </p>
+    {% endif %}
+
+    {% include "admin/_messages.html" %}
+
+    <form
+        action="{{ form_action }}"
+        method="post"
+        enctype="multipart/form-data"
+    >
+
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+
+        <h2>Nome</h2>
+
+        <div class="form-group">
+            <label for="name">Nome do ponto nesta rota (em branco = {{ point.name }})</label>
+            <input
+                type="text"
+                id="name"
+                name="name"
+                maxlength="150"
+                placeholder="{{ point.name }}"
+                value="{{ content.name }}"
+            >
+        </div>
+
+
+        <h2>Blocos de texto</h2>
+
+        <p>
+            Cada bloco tem um título (exibido em negrito no app) e um texto.
+            As quebras de linha do texto são mantidas. A ordem aqui é a ordem no app.
+        </p>
+
+        <div id="sections" class="repeat-list">
+            {% for section in content.sections %}
+                <div class="repeat-item">
+                    <div class="form-group">
+                        <label>Título</label>
+                        <input type="text" name="section_title" maxlength="150" value="{{ section.title }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Texto</label>
+                        <textarea name="section_body" rows="6">{{ section.body }}</textarea>
+                    </div>
+                    <div class="repeat-actions">
+                        <button type="button" class="secondary" data-move="-1">Subir</button>
+                        <button type="button" class="secondary" data-move="1">Descer</button>
+                        <button type="button" class="danger" data-remove>Remover</button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <button type="button" class="secondary" data-add="section">Adicionar bloco</button>
+
+
+
+        <h2>Foto</h2>
+
+        <div class="form-group">
+            {% if photo_url %}
+                <img src="{{ photo_url }}" alt="Foto do ponto nesta rota" class="photo-preview">
+            {% elif point_photo_url %}
+                <p class="muted">Sem foto própria: vale a foto do ponto.</p>
+                <img src="{{ point_photo_url }}" alt="Foto do ponto" class="photo-preview">
+            {% endif %}
+
+            <label for="photo">
+                {% if content.photo_key %}Substituir a foto{% else %}Foto do ponto nesta rota{% endif %}
+                (PNG, JPEG ou WebP, até 5 MB). Opcional.
+            </label>
+
+            <input type="file" id="photo" name="photo" accept="image/png,image/jpeg,image/webp">
+
+            {% if error %}
+                <p class="hint">Se você tinha escolhido uma foto, escolha de novo.</p>
+            {% endif %}
+
+            {% if content.photo_key %}
+                <label>
+                    <input type="checkbox" name="remove_photo" value="true">
+                    Remover a foto (volta a valer a do ponto)
+                </label>
+            {% endif %}
+        </div>
+
+
+        <h2>Áudio</h2>
+
+        <div class="form-group">
+            <p>Opcional. Sem áudio aqui, o ponto não tem áudio nesta rota.</p>
+
+            {% if audio_url %}
+                <audio controls preload="none" src="{{ audio_url }}" class="audio-preview"></audio>
+                <p class="muted">Duração: {{ content.audio_duration | duration }}</p>
+            {% endif %}
+
+            <label for="audio">
+                {% if content.audio_key %}Substituir o áudio{% else %}Arquivo de áudio{% endif %}
+                (MP3 ou M4A, até 20 MB, cerca de 10 minutos)
+            </label>
+
+            <input type="file" id="audio" name="audio" accept="audio/mpeg,audio/mp4,audio/x-m4a,.mp3,.m4a">
+
+            {% if error %}
+                <p class="hint">Se você tinha escolhido um áudio, escolha de novo.</p>
+            {% endif %}
+
+            {% if content.audio_key %}
+                <label>
+                    <input type="checkbox" name="remove_audio" value="true">
+                    Remover o áudio
+                </label>
+            {% endif %}
+        </div>
+
+
+        <h2>Vídeos do YouTube</h2>
+
+        <p>
+            Links youtube.com/watch?v=..., youtu.be/... ou youtube.com/shorts/....
+            Publique os vídeos como "não listado" ou "público": vídeos privados não tocam no app.
+        </p>
+
+        <div id="videos" class="repeat-list">
+            {% for video in content.videos %}
+                <div class="repeat-item">
+                    <div class="form-group">
+                        <label>Link</label>
+                        <input type="text" name="video_url" value="{{ video.url }}">
+                    </div>
+                    <div class="form-group">
+                        <label>Título (opcional)</label>
+                        <input type="text" name="video_title" maxlength="150" value="{{ video.title or '' }}">
+                    </div>
+                    <div class="repeat-actions">
+                        <button type="button" class="secondary" data-move="-1">Subir</button>
+                        <button type="button" class="secondary" data-move="1">Descer</button>
+                        <button type="button" class="danger" data-remove>Remover</button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <button type="button" class="secondary" data-add="video">Adicionar vídeo</button>
+
+
+
+        <h2>Estabelecimento</h2>
+
+        <div class="form-group">
+            <label for="address">Endereço</label>
+            <input type="text" id="address" name="address" maxlength="300" value="{{ content.address }}">
+        </div>
+
+        <div class="form-group">
+            <label for="opening_hours">Horário de funcionamento</label>
+            <textarea id="opening_hours" name="opening_hours" rows="3">{{ content.opening_hours }}</textarea>
+        </div>
+
+        <div class="form-group">
+            <label for="accessibility">Informações de acessibilidade</label>
+            <textarea id="accessibility" name="accessibility" rows="3">{{ content.accessibility }}</textarea>
+        </div>
+
+
+        <button type="submit">Salvar conteúdo nesta rota</button>
+
+    </form>
+
+    {% if exists %}
+        <h2>Voltar ao conteúdo do ponto</h2>
+
+        <form action="{{ form_action }}/delete" method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+            <p>Apaga o conteúdo próprio: nesta rota, o ponto volta a mostrar o conteúdo normal.</p>
+            <button type="submit" class="danger">Usar o conteúdo do ponto</button>
+        </form>
+    {% endif %}
+
+</div>
+
+
+<template id="section-template">
+    <div class="repeat-item">
+        <div class="form-group">
+            <label>Título</label>
+            <input type="text" name="section_title" maxlength="150">
+        </div>
+        <div class="form-group">
+            <label>Texto</label>
+            <textarea name="section_body" rows="6"></textarea>
+        </div>
+        <div class="repeat-actions">
+            <button type="button" class="secondary" data-move="-1">Subir</button>
+            <button type="button" class="secondary" data-move="1">Descer</button>
+            <button type="button" class="danger" data-remove>Remover</button>
+        </div>
+    </div>
+</template>
+
+<template id="video-template">
+    <div class="repeat-item">
+        <div class="form-group">
+            <label>Link</label>
+            <input type="text" name="video_url" placeholder="https://youtu.be/...">
+        </div>
+        <div class="form-group">
+            <label>Título (opcional)</label>
+            <input type="text" name="video_title" maxlength="150">
+        </div>
+        <div class="repeat-actions">
+            <button type="button" class="secondary" data-move="-1">Subir</button>
+            <button type="button" class="secondary" data-move="1">Descer</button>
+            <button type="button" class="danger" data-remove>Remover</button>
+        </div>
+    </div>
+</template>
+
+<script>
+    // Blocos de texto e vídeos: adicionar, remover e reordenar
+    document.addEventListener("click", function (event) {
+        const button = event.target.closest("button[type=button]");
+        if (!button) return;
+
+        if (button.dataset.add) {
+            const list = document.getElementById(button.dataset.add + "s");
+            const template = document.getElementById(button.dataset.add + "-template");
+            const item = template.content.firstElementChild.cloneNode(true);
+            list.appendChild(item);
+            item.querySelector("input, textarea").focus();
+            return;
+        }
+
+        const item = button.closest(".repeat-item");
+        if (!item) return;
+
+        if (button.hasAttribute("data-remove")) {
+            item.remove();
+        } else if (button.dataset.move === "-1" && item.previousElementSibling) {
+            item.parentNode.insertBefore(item, item.previousElementSibling);
+        } else if (button.dataset.move === "1" && item.nextElementSibling) {
+            item.parentNode.insertBefore(item.nextElementSibling, item);
+        }
+    });
+</script>
+
+</body>
+
+</html>

@@ -17,6 +17,7 @@ from app.model.user import User
 from app.model.user_route_completion import UserRouteCompletion
 from app.model.user_visit import UserVisit
 from app.service import storage_service
+from app.service.route_point_content_service import contents_for_route
 
 router = APIRouter(
     prefix="/routes",
@@ -56,19 +57,33 @@ def serialize_route_summary(route: Route, completed: bool) -> dict:
     }
 
 
-def serialize_route_detail(route: Route, completed: bool, visited: set[int]) -> dict:
+def _route_point(point, content, visited: set[int]) -> dict:
+    """Ponto na rota: nome e foto da rota, se ela tiver os próprios."""
+    photo_key = (content.photo_key if content and content.photo_key else point.photo_key)
+
+    return {
+        "id": point.id,
+        "name": (content.name if content and content.name else point.name),
+        "latitude": point.latitude,
+        "longitude": point.longitude,
+        "photo_url": storage_service.url(photo_key),
+        "visited": point.id in visited,
+    }
+
+
+def serialize_route_detail(
+    route: Route,
+    completed: bool,
+    visited: set[int],
+    contents: dict | None = None,
+) -> dict:
+    contents = contents or {}
+
     return {
         **serialize_route_summary(route, completed),
         "description": route.description,
         "points": [
-            {
-                "id": rp.mupi_object.id,
-                "name": rp.mupi_object.name,
-                "latitude": rp.mupi_object.latitude,
-                "longitude": rp.mupi_object.longitude,
-                "photo_url": storage_service.url(rp.mupi_object.photo_key),
-                "visited": rp.mupi_object.id in visited,
-            }
+            _route_point(rp.mupi_object, contents.get(rp.object_id), visited)
             for rp in route.points
         ],
         # Coordenadas [longitude, latitude], do primeiro ao último ponto
@@ -111,4 +126,9 @@ def get_route(route_id: int, user: User = Depends(get_current_user), db: Session
         db.query(UserVisit.object_id).filter(UserVisit.user_id == user.id)
     }
 
-    return serialize_route_detail(route, route.id in _completed_ids(db, user.id), visited)
+    return serialize_route_detail(
+        route,
+        route.id in _completed_ids(db, user.id),
+        visited,
+        contents_for_route(db, route.id),
+    )
