@@ -71,4 +71,5 @@ Teste de restauração (antes do beta):
 
 | Data | Onde | Backup | Resultado |
 |---|---|---|---|
-| 17/11/2026 | Local | `backup_teste_restauracao_2026-11-17.dump` (migração 0017, 21 tabelas) | Arquivo conferido com `pg_restore --list`; restauração pendente do banco de teste (passo 2) |
+| 17/11/2026 | Local | `backup_teste_restauracao_2026-11-17.dump` (migração 0017, 21 tabelas, 41 linhas) | ✅ Restaurado em `mupi_restauracao` sem erros; `check_restore`: mesmas tabelas, linhas e versão; pontos e rotas carregados pelo backend. Banco de teste apagado |
+| — | AWS | Backup automático do banco gerenciado | Pendente: quando a infraestrutura existir |
