@@ -3,7 +3,7 @@ from pathlib import Path
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from app.core.config import CORS_ALLOWED_ORIGIN_REGEX, CORS_ALLOWED_ORIGINS
+from app.core.config import API_DOCS, CORS_ALLOWED_ORIGIN_REGEX, CORS_ALLOWED_ORIGINS
 from app.core.cors import add_cors, parse_origins
 from app.controller.email_controller import router as email_router
 from app.controller.auth_controller import router as auth_router
@@ -26,7 +26,17 @@ from app.controller.mupi_object_controller import (
     mupi_object_api_router
 )
 
-app = FastAPI(title="MUPI API")
+
+
+def docs_urls(enabled: bool) -> dict:
+    """Documentação automática só quando ligada (API_DOCS, INF-09)."""
+    if enabled:
+        return {"docs_url": "/docs", "redoc_url": "/redoc", "openapi_url": "/openapi.json"}
+
+    return {"docs_url": None, "redoc_url": None, "openapi_url": None}
+
+
+app = FastAPI(title="MUPI API", **docs_urls(API_DOCS))
 
 app.include_router(user_router)
 

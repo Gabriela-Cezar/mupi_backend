@@ -2,11 +2,17 @@ from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy.orm import Session
 
+from app.core import config
+from app.core.rate_limit import RateLimiter, format_wait, too_many_requests
 from app.core.security import decode_access_token, token_version_matches
 from app.database.database import get_db
 from app.model.user import User
 
 bearer_scheme = HTTPBearer(auto_error=False)
+
+# Limite geral por usuário nas rotas do app (INF-08): protege o servidor de
+# um app com defeito em laço ou de uso abusivo de uma conta
+app_request_limiter = RateLimiter(config.APP_REQUESTS_PER_MINUTE, 60)
 
 
 def get_current_user(
@@ -40,5 +46,13 @@ def get_current_user(
         or not token_version_matches(payload, user.token_version)
     ):
         raise unauthorized
+
+    wait = app_request_limiter.hit(user.id)
+
+    if wait:
+        raise too_many_requests(
+            wait,
+            f"Muitas requisições em pouco tempo. Aguarde {format_wait(wait)} e tente de novo.",
+        )
 
     return user

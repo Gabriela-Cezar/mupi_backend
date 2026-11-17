@@ -39,10 +39,44 @@ def _positive_float(name: str, default: float) -> float:
     return number
 
 
+def _positive_int(name: str, default: int) -> int:
+    value = _optional(name)
+
+    if value is None:
+        return default
+
+    try:
+        number = int(value)
+    except ValueError:
+        raise RuntimeError(f"{name} deve ser um número inteiro: {value!r}")
+
+    if number <= 0:
+        raise RuntimeError(f"{name} deve ser maior que zero: {value!r}")
+
+    return number
+
+
+MIN_SECRET_KEY_LENGTH = 32
+
 DATABASE_URL = _require("DATABASE_URL")
 RESEND_API_KEY = _require("RESEND_API_KEY")
 EMAIL_FROM = _require("EMAIL_FROM")
 SECRET_KEY = _require("SECRET_KEY")
+
+# Chave fraca permitiria forjar tokens (INF-09). Use uma por ambiente.
+if len(SECRET_KEY) < MIN_SECRET_KEY_LENGTH:
+    raise RuntimeError(
+        f"SECRET_KEY muito curta (mínimo de {MIN_SECRET_KEY_LENGTH} caracteres). Gere uma com: "
+        'python -c "import secrets; print(secrets.token_urlsafe(64))"'
+    )
+
+# Documentação automática (/docs, /redoc, /openapi.json). Desligada por
+# padrão: ligue só no desenvolvimento (INF-09).
+API_DOCS = os.getenv("API_DOCS", "false").lower() == "true"
+
+# Limite geral de requisições por usuário nas rotas do app com login, por
+# minuto (INF-08). O uso normal do app fica bem abaixo disto.
+APP_REQUESTS_PER_MINUTE = _positive_int("APP_REQUESTS_PER_MINUTE", 120)
 
 # Cookie de sessão do painel só trafega por HTTPS. Os navegadores aceitam
 # cookies "Secure" em http://localhost, então o padrão serve também no

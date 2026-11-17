@@ -34,6 +34,7 @@ from sqlalchemy.pool import StaticPool  # noqa: E402
 
 from app.controller import auth_controller  # noqa: E402
 from app.controller import user_controller  # noqa: E402
+from app.core import dependencies  # noqa: E402
 
 LIMITADORES_DE_EMAIL = (
     auth_controller.register_email_limiter,
@@ -46,6 +47,7 @@ LIMITADORES_DE_LOGIN = (
     auth_controller.login_ip_limiter,
     auth_controller.refresh_limiter,
     user_controller.delete_account_limiter,
+    dependencies.app_request_limiter,
 )
 from app.core import admin_auth  # noqa: E402
 from app.core.security import create_access_token, csrf_token_for  # noqa: E402

@@ -107,7 +107,7 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 
 ## Etapa 7 — Preparação do beta
 
-- [ ] **Backend:** limite geral por usuário nas rotas do app (INF-08); `/docs` e `/redoc` desligados em produção (INF-09)
+- [x] **Backend:** limite geral por usuário nas rotas do app (INF-08); `/docs` e `/redoc` desligados em produção (INF-09) — 17/11. `APP_REQUESTS_PER_MINUTE` (padrão 120 por minuto, todas as rotas com login somadas; 429 com a espera); documentação só com `API_DOCS=true` (padrão desligada); servidor não sobe com `SECRET_KEY` de menos de 32 caracteres. Logs conferidos: sem senhas, códigos nem tokens
 - [ ] **Backend:** testar a restauração de um backup (INF-06); lista de rotas alteradas para o app (INF-13)
 - [ ] **App:** textos de permissão de localização (APP-INF-04); pausar o GPS em segundo plano (APP-INF-06)
 - [ ] **App:** nome, ícone, identificador definitivo e versão (APP-INF-11)
