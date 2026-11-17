@@ -17,6 +17,9 @@ os.environ.pop("S3_ENDPOINT_URL", None)
 os.environ["LOCAL_STORAGE_DIR"] = ""
 # Login com Google desligado por padrão; os testes dele ligam (fixture google)
 os.environ["GOOGLE_CLIENT_IDS"] = ""
+# Documentação desligada como em produção, mesmo com API_DOCS=true no .env
+os.environ["API_DOCS"] = "false"
+os.environ.pop("APP_REQUESTS_PER_MINUTE", None)
 # Regra de distância da abertura (VIS-02) fixa nos testes, independente do .env
 os.environ["VISIT_MAX_DISTANCE_M"] = "25"
 os.environ["VISIT_GPS_TOLERANCE_M"] = "15"

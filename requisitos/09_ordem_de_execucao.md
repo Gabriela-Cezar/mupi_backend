@@ -108,7 +108,7 @@ Vem antes de tudo porque foto, áudio, capa de rota e imagem de insígnia depend
 ## Etapa 7 — Preparação do beta
 
 - [x] **Backend:** limite geral por usuário nas rotas do app (INF-08); `/docs` e `/redoc` desligados em produção (INF-09) — 17/11. `APP_REQUESTS_PER_MINUTE` (padrão 120 por minuto, todas as rotas com login somadas; 429 com a espera); documentação só com `API_DOCS=true` (padrão desligada); servidor não sobe com `SECRET_KEY` de menos de 32 caracteres. Logs conferidos: sem senhas, códigos nem tokens
-- [ ] **Backend:** testar a restauração de um backup (INF-06); lista de rotas alteradas para o app (INF-13)
+- [ ] **Backend:** testar a restauração de um backup (INF-06); lista de rotas alteradas para o app (INF-13) — 17/11: lista em `requisitos/10_mudancas_da_api.md` (feito); conferência `python -m app.scripts.check_restore` e passo a passo em `infra/backup_e_restauracao.md` (feito); backup local novo conferido com `pg_restore --list`. **Falta** restaurar num banco de teste (precisa do administrador do PostgreSQL) e, com a AWS, repetir no backup automático
 - [ ] **App:** textos de permissão de localização (APP-INF-04); pausar o GPS em segundo plano (APP-INF-06)
 - [ ] **App:** nome, ícone, identificador definitivo e versão (APP-INF-11)
 - [ ] **App:** política de privacidade publicada, formulários das lojas, conta de teste para revisores (APP-INF-12)
